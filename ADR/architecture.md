@@ -83,14 +83,14 @@ Subcontractors (electricians, plumbers, HVAC) need to capture, approve, and lock
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
                            │
-          ┌────────────────┼────────────────┐
-          │                │                │
-          ▼                ▼                ▼
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│   Postmark   │  │   OpenAI     │  │   Native     │
-│   (Email)    │  │   (Voice     │  │   Device     │
-│              │  │   Cleanup)   │  │   STT APIs   │
-└──────────────┘  └──────────────┘  └──────────────┘
+       ┌───────────────────┼───────────────────┐
+       │                   │                   │
+       ▼                   ▼                   ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│   Postmark   │  │   OpenAI     │  │   Twilio     │  │   Native     │
+│   (Email)    │  │   (Voice     │  │   (SMS for   │  │   Device     │
+│              │  │   Cleanup)   │  │   signing)   │  │   STT APIs   │
+└──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
 ```
 
 ### Key Component Responsibilities
@@ -104,6 +104,7 @@ Subcontractors (electricians, plumbers, HVAC) need to capture, approve, and lock
 | **Typst** | PDF generation from templates (fast, reproducible) |
 | **Postmark** | Transactional email delivery with delivery tracking |
 | **OpenAI API** | Voice transcription cleanup (grammar, professionalism) |
+| **Twilio** | SMS delivery for signature verification codes |
 | **Device STT** | iOS/Android native speech-to-text (raw capture) |
 
 ### Why This Architecture Fits Construction Workflows
@@ -121,6 +122,78 @@ Subcontractors (electricians, plumbers, HVAC) need to capture, approve, and lock
 ---
 
 ## 2. Tech Stack (with Justification)
+
+### Frontend (Web): React + Vite
+
+**Decision**: React 18 + Vite + React Router v6  
+**Options considered**: Next.js, Vite + React, Remix  
+
+**Why Vite over Next.js**:
+- **Simpler**: No server/client component confusion—it's just a SPA
+- **Faster**: Vite HMR is ~50ms vs Next.js ~200ms
+- **No SSR needed**: This is a logged-in app, no SEO requirements
+- **Better PWA support**: `vite-plugin-pwa` is more mature than `next-pwa`
+- **Static output**: Just files served by Caddy—no Node.js runtime needed
+- **No Vercel dependency**: Vercel Pro costs $20+/mo for commercial use
+
+**Why NOT Next.js**:
+- SSR/SSG solves problems this app doesn't have
+- App Router adds complexity for a SPA
+- Static export removes most Next.js benefits anyway
+- Overkill for logged-in CRUD app with separate backend
+
+**PWA support** (important for construction sites with poor connectivity):
+```ts
+// vite.config.ts
+import { VitePWA } from 'vite-plugin-pwa'
+export default {
+  plugins: [VitePWA({ registerType: 'autoUpdate' })]
+}
+```
+
+**Key libraries**:
+| Purpose | Library |
+|---------|---------|
+| Routing | React Router v6 |
+| Styling | Tailwind CSS |
+| Forms | React Hook Form + Zod |
+| Server state | TanStack Query (React Query) |
+| Local state | Zustand |
+| HTTP | Native fetch |
+| Signature | react-signature-canvas |
+
+**Build & deployment**: `vite build` → static files → Caddy serves from `/srv/web`
+
+### Frontend (Mobile): React Native + Expo
+
+**Decision**: React Native with Expo managed workflow  
+**Options considered**: React Native, Flutter, native iOS/Android, PWA-only  
+
+**Why React Native + Expo**:
+- **Code sharing**: TypeScript across web and mobile; share types, validation, API client
+- **Expo simplifies**: Managed builds, OTA updates, camera/permissions handled
+- **Two apps, one codebase**: iOS + Android from single codebase
+- **Offline-first**: AsyncStorage + React Query persistence for poor connectivity
+
+**Why NOT Flutter**: Different language (Dart), no code sharing with web  
+**Why NOT PWA-only**: Limited camera access, no app store presence (matters for B2B credibility)
+
+**Key libraries**:
+| Purpose | Library |
+|---------|---------|
+| Navigation | React Navigation |
+| Camera | expo-camera, expo-image-picker |
+| Voice-to-text | react-native-voice (native STT) |
+| Signature | react-native-signature-canvas |
+| Offline storage | AsyncStorage + React Query persistence |
+
+**Shared code structure**:
+```
+/packages
+  /shared        # Types, API client, Zod schemas, utils
+  /web           # Vite + React app
+  /mobile        # Expo + React Native app
+```
 
 ### Backend: Go 1.22+
 
@@ -159,6 +232,99 @@ Subcontractors (electricians, plumbers, HVAC) need to capture, approve, and lock
 - Versioned: `/api/v1/...`
 - Resource-oriented: `/api/v1/tickets`, `/api/v1/tickets/{id}/photos`
 - Consistent error format: `{"error": {"code": "TICKET_LOCKED", "message": "..."}}`
+
+**Pagination** (cursor-based for lists):
+```
+GET /api/v1/tickets?limit=20&cursor=abc123&status=approved&sort=-created_at
+
+Response:
+{
+  "data": [...],
+  "pagination": {
+    "limit": 20,
+    "next_cursor": "def456",   // null if no more pages
+    "has_more": true
+  }
+}
+```
+
+**Idempotency** (for unsafe operations):
+```
+POST /api/v1/tickets
+Headers:
+  Idempotency-Key: client-generated-uuid
+
+- Server stores key → response mapping for 24 hours
+- Duplicate requests return cached response
+- Prevents double-submission on flaky mobile connections
+```
+
+**API contract examples**:
+
+```
+# Create Ticket
+POST /api/v1/tickets
+Request:
+{
+  "project_id": "uuid",
+  "title": "Extra conduit run - Building B",
+  "work_date": "2024-12-29",
+  "ticket_type": "time_materials"
+}
+Response (201):
+{
+  "id": "uuid",
+  "ticket_number": "TM-2024-0042",
+  "status": "draft",
+  "created_at": "2024-12-29T10:30:00Z"
+}
+
+# Upload Photo
+POST /api/v1/tickets/{id}/photos
+Content-Type: multipart/form-data
+Fields: file, caption, taken_at, latitude, longitude, client_hash
+Response (201):
+{
+  "id": "uuid",
+  "file_path": "/files/photos/...",
+  "thumbnail_url": "/files/thumbs/..."
+}
+
+# Request Signature
+POST /api/v1/tickets/{id}/signature-request
+Request:
+{
+  "signer_email": "gcsuper@contractor.com",
+  "signer_phone": "+1234567890"
+}
+Response (201):
+{
+  "signing_link_id": "uuid",
+  "expires_at": "2024-12-30T10:30:00Z",
+  "sent_via": ["sms", "email"]
+}
+
+# Error Responses
+{
+  "error": {
+    "code": "TICKET_LOCKED",
+    "message": "Cannot modify a locked ticket",
+    "details": {
+      "ticket_id": "uuid",
+      "locked_at": "2024-12-29T10:30:00Z"
+    }
+  }
+}
+
+Error codes:
+- VALIDATION_ERROR (400) - Invalid input
+- UNAUTHORIZED (401) - Missing or invalid token
+- FORBIDDEN (403) - No permission for this resource
+- NOT_FOUND (404) - Resource doesn't exist
+- CONFLICT (409) - State conflict (e.g., already signed)
+- TICKET_LOCKED (422) - Cannot modify locked ticket
+- RATE_LIMITED (429) - Too many requests
+```
 
 ### Database: PostgreSQL 16
 
@@ -244,20 +410,55 @@ Subcontractors (electricians, plumbers, HVAC) need to capture, approve, and lock
 
 **Webhook integration**: Postmark POSTs delivery status to `/api/v1/webhooks/postmark`, updating `email_events` table.
 
-### Authentication: JWT + Refresh Tokens
+### Authentication: Manual JWT + Microsoft OAuth
 
-**Decision**: Stateless JWT access tokens + rotating refresh tokens  
-**Options considered**: Session cookies, JWT-only, OAuth2 with third-party IdP  
-**Why chosen**:
-- Mobile-friendly (no cookie handling)
-- Stateless verification (no DB lookup on every request)
-- Refresh tokens enable revocation without short-lived access tokens
+**Decision**: Manual email/password auth with JWT tokens + optional Microsoft OAuth  
+**Options considered**: Firebase Auth, Auth0, Clerk, WorkOS, manual implementation  
+
+**Why manual over managed auth**:
+- **B2B construction reality**: Social login (Google, Apple) rarely used in this industry
+- **Microsoft dominates**: Construction companies use Microsoft 365—"Sign in with Microsoft" is the only social login that makes sense
+- **Full control**: No external dependency during auth flow
+- **Simple to build**: Email/password + JWT is 2-3 days of work
+- **Cost**: $0 forever
+
+**Why NOT Firebase/Clerk**:
+- Social login (Google, Apple) won't be used—construction workers use company email
+- Phone auth can be done with Twilio directly
+- Adds external dependency for minimal benefit
+
+**Auth methods supported**:
+
+| Method | Implementation | When used |
+|--------|---------------|-----------|
+| Email/password | Manual (bcrypt + JWT) | Default for all users |
+| Sign in with Microsoft | MSAL library | Optional, for O365 users |
+| Enterprise SSO (Azure AD/Okta) | WorkOS (Phase 2) | When enterprise customers require |
+
+**Password handling**:
+```go
+// Registration: hash with bcrypt
+hash, _ := bcrypt.GenerateFromPassword([]byte(password), 12)
+
+// Login: verify
+err := bcrypt.CompareHashAndPassword(user.PasswordHash, []byte(password))
+```
 
 **Token structure**:
 - Access token: 15-minute expiry, contains `user_id`, `company_id`, `role`
 - Refresh token: 30-day expiry, stored in DB (revocable), rotated on use
 
-**Future consideration**: Add "Sign in with Apple/Google" for mobile convenience (Phase 2).
+**Microsoft OAuth flow** (optional):
+1. User clicks "Sign in with Microsoft"
+2. Redirect to Microsoft login (MSAL library)
+3. Microsoft returns authorization code
+4. Backend exchanges code for user info
+5. Create/match user in PostgreSQL by email
+6. Issue JWT tokens (same as email/password flow)
+
+**SMS for signature verification**: Use Twilio directly (see signing flow). Keeps auth simple.
+
+**Enterprise SSO (Phase 2)**: When large GC requires Azure AD SSO, add WorkOS alongside manual auth. WorkOS handles SSO; manual auth continues for regular users.
 
 ### Voice Transcription Cleanup: OpenAI GPT-4o-mini
 
@@ -388,58 +589,145 @@ siteproof.app {
 }
 ```
 
-### Process Manager: systemd
+### Containerization: Docker + docker-compose
 
-**Decision**: systemd  
-**Why**: Native to Ubuntu, reliable, well-documented, handles restarts and logging.
+**Decision**: Docker containers managed by docker-compose  
+**Options considered**: Bare metal + systemd, Docker, Kubernetes  
 
-**Service file** (`/etc/systemd/system/siteproof-api.service`):
-```ini
-[Unit]
-Description=SiteProof API Server
-After=network.target postgresql.service
+**Why Docker over bare systemd**:
+- **Easy replication**: `docker compose up -d` on any VPS—identical environment
+- **Simpler scaling**: Adding VPS #2 or #3 is trivial
+- **Consistent environments**: Same containers in dev, CI, and prod
+- **Dependency bundling**: Go, Typst, Caddy all containerized
+- **Easy rollback**: Pull previous image tag
 
-[Service]
-Type=simple
-User=siteproof
-Group=siteproof
-WorkingDirectory=/opt/siteproof
-ExecStart=/opt/siteproof/bin/siteproof-api
-Restart=always
-RestartSec=5
-Environment=CONFIG_PATH=/opt/siteproof/config/config.yaml
-EnvironmentFile=/opt/siteproof/config/secrets.env
+**Why NOT Kubernetes**:
+- Overkill for 1-3 VPSes
+- Adds significant operational complexity
+- Docker-compose is sufficient until 5+ services or auto-scaling needed
 
-# Security hardening
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/data/uploads /var/log/siteproof
+**docker-compose.yml**:
+```yaml
+version: "3.8"
 
-[Install]
-WantedBy=multi-user.target
+services:
+  api:
+    image: ghcr.io/yourcompany/siteproof-api:${VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - POSTMARK_API_KEY=${POSTMARK_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - JWT_SECRET=${JWT_SECRET}
+    volumes:
+      - uploads:/data/uploads
+      - ./templates:/opt/siteproof/templates:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web:/srv/web:ro           # Static frontend (vite build output)
+      - uploads:/srv/uploads:ro      # Uploaded files
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # PostgreSQL - only on primary VPS, or use managed DB
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=siteproof
+      - POSTGRES_USER=siteproof
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Not exposed externally - only accessible to api container
+
+volumes:
+  uploads:
+  caddy_data:
+  caddy_config:
+  pgdata:
+```
+
+**Dockerfile** (Go API):
+```dockerfile
+FROM golang:1.22-alpine AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -o siteproof-api ./cmd/api
+
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates tzdata curl
+# Install Typst for PDF generation
+RUN apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing typst
+WORKDIR /opt/siteproof
+COPY --from=builder /app/siteproof-api ./bin/
+COPY templates ./templates/
+EXPOSE 8080
+CMD ["./bin/siteproof-api"]
+```
+
+**Deployment to VPS**:
+```bash
+# On any VPS (initial or scaled)
+git clone <repo> /opt/siteproof  # Or just docker-compose.yml + .env
+cd /opt/siteproof
+cp .env.example .env             # Fill in secrets
+docker compose pull
+docker compose up -d
 ```
 
 ### Secrets Management
 
-**Decision**: Environment file + systemd  
+**Decision**: `.env` file for Docker, never committed to git  
 **Options considered**: HashiCorp Vault, AWS Secrets Manager, env files  
 **Why chosen**:
-- Simplest approach for single-server deployment
+- Simplest approach for Docker deployments
 - No external dependency
-- Secrets never in git
+- `.env` stays on server, never in repo
 
-**Secrets file** (`/opt/siteproof/config/secrets.env`):
+**`.env` file** (on each VPS):
 ```bash
-DATABASE_URL=postgres://siteproof:xxx@localhost/siteproof?sslmode=disable
+# Database
+DATABASE_URL=postgres://siteproof:xxx@db:5432/siteproof?sslmode=disable
+DB_PASSWORD=xxx
+
+# External services
 POSTMARK_API_KEY=xxx
 OPENAI_API_KEY=xxx
+TWILIO_ACCOUNT_SID=xxx
+TWILIO_AUTH_TOKEN=xxx
+
+# Auth
 JWT_SECRET=xxx
+MICROSOFT_CLIENT_ID=xxx
+MICROSOFT_CLIENT_SECRET=xxx
+
+# Versioning
+VERSION=1.2.3
 ```
 
-**Permissions**: `chmod 600`, owned by root, readable by systemd.
+**Security**:
+- `.env` file: `chmod 600`, owned by root
+- `.env` in `.gitignore` (never committed)
+- Use `.env.example` with placeholder values for documentation
 
-**Phase 2**: Migrate to Infisical or 1Password Secrets Automation when team grows.
+**Phase 2**: Migrate to Infisical, Doppler, or 1Password Secrets Automation when team grows.
 
 ### Backups
 
@@ -467,15 +755,21 @@ rsync -az /data/backups/ u123456@u123456.your-storagebox.de:backups/
 
 ### CI/CD
 
-**Decision**: GitHub Actions → SSH deploy  
-**Why**: Simple, no additional infrastructure, sufficient for small team.
+**Decision**: GitHub Actions → Docker build → Push to registry → Pull on VPS  
+**Why**: Simple, Docker-native, easy to scale to multiple VPSes.
 
 **Pipeline**:
 ```yaml
-name: Deploy
+name: Build and Deploy
 on:
   push:
     branches: [main]
+    tags: ['v*']
+
+env:
+  REGISTRY: ghcr.io
+  API_IMAGE: ghcr.io/${{ github.repository }}/api
+  WEB_IMAGE: ghcr.io/${{ github.repository }}/web
 
 jobs:
   test:
@@ -486,31 +780,62 @@ jobs:
         with:
           go-version: '1.22'
       - run: go test ./...
-      - run: go build -o siteproof-api ./cmd/api
 
-  deploy:
+  build-api:
     needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: docker/login-action@v3
         with:
-          go-version: '1.22'
-      
-      - name: Build
-        run: |
-          CGO_ENABLED=0 GOOS=linux go build -o siteproof-api ./cmd/api
-      
-      - name: Deploy
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.API_IMAGE }}:latest
+            ${{ env.API_IMAGE }}:${{ github.sha }}
+
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: cd packages/web && npm ci && npm run build
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./packages/web
+          push: true
+          tags: ${{ env.WEB_IMAGE }}:latest
+
+  deploy:
+    needs: [build-api, build-web]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS(es)
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
+          VPS_HOSTS: ${{ secrets.VPS_HOSTS }}  # "vps1.example.com,vps2.example.com"
         run: |
           echo "$SSH_KEY" > key && chmod 600 key
-          scp -i key siteproof-api deploy@siteproof.app:/opt/siteproof/bin/
-          ssh -i key deploy@siteproof.app "sudo systemctl restart siteproof-api"
+          for host in ${VPS_HOSTS//,/ }; do
+            ssh -i key deploy@$host "cd /opt/siteproof && docker compose pull && docker compose up -d"
+          done
 ```
 
-**Deployment strategy**: Direct replacement (not blue/green). Acceptable for MVP given:
+**Scaling deployment**: Add VPS hostnames to `VPS_HOSTS` secret. Same deploy command runs on all.
+
+**Deployment strategy**: Rolling update via docker-compose (containers restart one by one). Acceptable for MVP given:
 - Go binary starts in <1 second
 - Stateless server (requests in flight may fail, clients retry)
 
@@ -1499,6 +1824,36 @@ FOR EACH ROW EXECUTE FUNCTION prevent_locked_ticket_changes();
 
 ## 6. Security & Correctness
 
+### Data Classification
+
+| Classification | Fields | Handling |
+|----------------|--------|----------|
+| **PII** | `users.email`, `users.phone`, `users.name`, `signatures.signer_name` | Redacted in logs, deletable on request |
+| **Sensitive** | `users.password_hash`, JWT secrets, API keys, signature images | Never logged, encrypted at rest (PostgreSQL TDE if needed) |
+| **Business Confidential** | Ticket details, photos, line items, PDFs | Access controlled by `company_id`, audit logged |
+| **Audit Data** | `audit_logs.*`, `transcription_versions.*` | Immutable, retained for legal compliance |
+| **Public** | None | N/A - all data requires authentication |
+
+### Data Retention Policy
+
+| Data Type | Retention Period | Deletion Trigger | Notes |
+|-----------|------------------|------------------|-------|
+| **Locked tickets + PDFs** | Indefinite | None | Legal records, immutable by design |
+| **Draft tickets** | 90 days if abandoned | Auto-cleanup job | Notify user before deletion |
+| **Rejected tickets** | 1 year | Auto-cleanup job | May be needed for dispute reference |
+| **Photos** | Tied to ticket lifecycle | Cascade delete with ticket | |
+| **Audit logs** | 7 years minimum | Legal requirement | May be extended per contract |
+| **User accounts** | Until deletion request | GDPR/CCPA request | Soft delete, anonymize after 30 days |
+| **Transcription versions** | Tied to ticket lifecycle | Cascade delete with ticket | |
+| **Email events** | 2 years | Auto-cleanup job | Delivery tracking |
+| **Signing links** | 30 days after use/expiry | Auto-cleanup job | Short-lived tokens |
+
+**User deletion flow**:
+1. User requests account deletion
+2. Soft delete: `users.deleted_at = now()`, `users.active = false`
+3. 30-day grace period (can restore)
+4. Hard delete: Anonymize PII, retain audit logs with anonymized actor
+
 ### Threat Model Summary
 
 | Asset | Threat | Mitigation |
@@ -1637,6 +1992,51 @@ Response: {
 2. **Unique constraints**: ticket_number per company, one signature per type per ticket
 3. **Check constraints**: Valid status transitions, valid roles
 4. **Optimistic locking**: `updated_at` column checked on updates (prevents lost updates)
+
+### Consistency Model
+
+| Operation | Consistency | Rationale |
+|-----------|-------------|-----------|
+| Ticket CRUD | **Strong** (PostgreSQL ACID) | Cannot lose user data |
+| Signature + status change + PDF generation | **Strong** (single DB transaction) | Atomic state transition |
+| Photo upload | **Strong** | File saved before DB commit |
+| Audit log writes | **Strong** | Must never lose audit trail |
+| Email delivery status | **Eventual** (webhook callback) | Acceptable delay; Postmark is source of truth |
+| Voice cleanup | **Synchronous** | User waits for result |
+
+**Transaction boundaries**:
+- Signature capture is atomic: `BEGIN` → save signature → update ticket status → create audit log → `COMMIT`
+- If any step fails, entire operation rolls back
+- PDF generation happens after commit (if it fails, ticket is approved but PDF is regenerated on retry)
+
+### External Service Resilience
+
+| Service | Timeout | Retry Strategy | Circuit Breaker | Fallback |
+|---------|---------|----------------|-----------------|----------|
+| **OpenAI** (voice cleanup) | 10s | 2× with 1s backoff | Open after 5 consecutive failures, reset after 30s | Return raw transcription text |
+| **Postmark** (email) | 5s | 3× with exponential backoff | Open after 10 failures | Queue to `failed_emails` table, retry via background job |
+| **Twilio** (SMS) | 5s | 2× with 500ms backoff | Open after 5 failures | Show "SMS failed, try link-based signing" |
+| **PostgreSQL** | 3s | No retry (fail fast) | N/A | Return 503 to client |
+
+**Implementation** (Go):
+```go
+// Circuit breaker for OpenAI
+openaiBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{
+    Name:        "openai",
+    MaxRequests: 3,              // Requests allowed in half-open state
+    Interval:    30 * time.Second,
+    Timeout:     30 * time.Second, // Time to stay open before half-open
+    ReadyToTrip: func(counts gobreaker.Counts) bool {
+        return counts.ConsecutiveFailures >= 5
+    },
+})
+```
+
+**Idempotency implementation**:
+- `POST` operations accept `Idempotency-Key` header
+- Server stores `hash(key + endpoint) → response` in Redis or PostgreSQL for 24 hours
+- Duplicate requests within window return cached response with `X-Idempotent-Replayed: true` header
+- Natural idempotency: photo uploads use SHA-256 hash as dedup key
 
 ### Time & Timezone Correctness
 
@@ -1871,6 +2271,26 @@ Deploy script: parallel SSH to all app servers, rolling restart. This handles **
 **Effort**: Significant (weeks)  
 **Risk**: Medium (distributed systems complexity)
 
+### Enterprise SSO via WorkOS (Trigger: Enterprise customer request)
+
+**When**: Large GC or national subcontractor requires Okta/Azure AD SSO for their users  
+**Why**: Enterprise IT departments mandate SSO for security compliance; deal-blocking for large contracts
+
+**How**:
+1. Sign up for WorkOS (free to start, ~$125/mo per SSO connection when active)
+2. Integrate WorkOS SDK alongside manual auth
+3. Routing logic: If user's email domain has SSO configured → WorkOS; otherwise → manual auth
+4. WorkOS returns user profile → create/match user in PostgreSQL → issue JWT
+5. Manual email/password auth continues for non-SSO users
+
+**Effort**: 1-2 days integration  
+**Risk**: Low (WorkOS designed to complement existing auth)
+
+**Also enables**:
+- SCIM directory sync (auto-provision/deprovision users from enterprise IdP)
+- Audit logs for compliance
+- "Sign in with Microsoft" via Azure AD SSO (replaces basic OAuth)
+
 ### Local LLM for Voice Cleanup (Trigger: 50K+ cleanups/month OR enterprise privacy requirements)
 
 **When**: 
@@ -2034,9 +2454,12 @@ GET /health
 | ADR-005 | Postmark for email | Accepted |
 | ADR-006 | Hash chain for audit logs | Accepted |
 | ADR-007 | Synchronous voice cleanup | Accepted |
-| ADR-008 | JWT + refresh tokens for auth | Accepted |
-| ADR-009 | Single VPS deployment | Accepted |
-| ADR-010 | React Native for mobile (deferred) | Proposed |
+| ADR-008 | Manual JWT auth + Microsoft OAuth | Accepted |
+| ADR-009 | Docker + docker-compose for deployment | Accepted |
+| ADR-010 | React + Vite for web frontend (PWA) | Accepted |
+| ADR-011 | React Native + Expo for mobile | Accepted |
+| ADR-012 | Twilio for SMS (signing verification) | Accepted |
+| ADR-013 | WorkOS for future enterprise SSO | Proposed |
 
 ---
 
