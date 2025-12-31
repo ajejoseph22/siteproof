@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Build artifacts
+bin/
+dist/
+
+# Dependencies (downloaded fresh in Docker)
+vendor/
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+
+# Test and coverage
+*.test
+coverage.out
+coverage.html
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+*.tmp
+*.log
+
+# Local development
+docker-compose.override.yml
+
