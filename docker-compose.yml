@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://siteproof:${DB_PASSWORD:-siteproof}@db:5432/siteproof?sslmode=disable
+      - JWT_SECRET=${JWT_SECRET}
+      - POSTMARK_API_KEY=${POSTMARK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+    volumes:
+      - uploads:/data/uploads
+      - ./templates:/opt/siteproof/templates:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=siteproof
+      - POSTGRES_USER=siteproof
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-siteproof}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U siteproof -d siteproof"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # Uncomment to expose for local development
+    # ports:
+    #   - "5432:5432"
+
+  migrate:
+    image: migrate/migrate:v4.17.0
+    volumes:
+      - ./migrations:/migrations:ro
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://siteproof:${DB_PASSWORD:-siteproof}@db:5432/siteproof?sslmode=disable",
+      "up"
+    ]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  uploads:
+  pgdata:
+
