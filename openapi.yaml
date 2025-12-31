@@ -1,0 +1,1899 @@
+openapi: 3.1.0
+info:
+  title: SiteProof API
+  description: |
+    REST API for SiteProof - a mobile-first T&M (Time & Materials) and variation 
+    capture system for construction subcontractors.
+    
+    ## Authentication
+    
+    Most endpoints require a valid JWT access token passed in the `Authorization` header:
+    ```
+    Authorization: Bearer <access_token>
+    ```
+    
+    Access tokens expire after 15 minutes. Use the refresh token endpoint to obtain new tokens.
+    
+    ## Multi-tenancy
+    
+    All data is scoped to the authenticated user's company. Users can only access 
+    resources belonging to their company.
+    
+    ## Error Handling
+    
+    All errors follow a consistent format:
+    ```json
+    {
+      "error": {
+        "code": "ERROR_CODE",
+        "message": "Human-readable message",
+        "details": {}
+      }
+    }
+    ```
+    
+    ## Idempotency
+    
+    For POST operations, include an `Idempotency-Key` header with a unique client-generated 
+    UUID to prevent duplicate submissions on flaky mobile connections.
+    
+  version: 1.0.0
+  contact:
+    name: SiteProof Support
+    email: support@siteproof.app
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://api.siteproof.app
+    description: Production
+
+tags:
+  - name: Auth
+    description: Authentication and authorization
+  - name: Projects
+    description: Construction project management
+  - name: Tickets
+    description: T&M and variation ticket operations
+  - name: Photos
+    description: Photo evidence upload and management
+  - name: Signatures
+    description: Digital signature capture
+  - name: Health
+    description: Health check endpoints
+
+paths:
+  # ==========================================================================
+  # Health Endpoints
+  # ==========================================================================
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns the health status of the API server
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /ready:
+    get:
+      tags: [Health]
+      summary: Readiness check
+      description: Returns readiness status including database connectivity
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========================================================================
+  # Auth Endpoints
+  # ==========================================================================
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: User login
+      description: Authenticate with email and password to receive JWT tokens
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: "foreman@acmeelectric.com"
+              password: "securepassword123"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Invalid request body or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "validation failed"
+                  details:
+                    email: "is required"
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "INVALID_CREDENTIALS"
+                  message: "invalid email or password"
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh tokens
+      description: Exchange a refresh token for new access and refresh tokens
+      operationId: refreshTokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Tokens refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: Revoke all refresh tokens for the current user
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "logged out successfully"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      description: Returns information about the authenticated user
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================================================
+  # Project Endpoints
+  # ==========================================================================
+  /api/v1/projects:
+    get:
+      tags: [Projects]
+      summary: List projects
+      description: List all projects for the authenticated user's company
+      operationId: listProjects
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Filter by project status
+          schema:
+            type: string
+            enum: [active, completed, archived]
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Projects]
+      summary: Create project
+      description: Create a new construction project
+      operationId: createProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+            example:
+              name: "Downtown Office Tower"
+              address: "123 Main St, New York, NY 10001"
+              gc_company_name: "BuildCo General Contractors"
+              gc_contact_email: "super@buildco.com"
+              timezone: "America/New_York"
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/projects/{id}:
+    get:
+      tags: [Projects]
+      summary: Get project
+      description: Get a specific project by ID
+      operationId: getProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Projects]
+      summary: Update project
+      description: Update a project's details
+      operationId: updateProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/projects/{project_id}/tickets:
+    get:
+      tags: [Tickets]
+      summary: List tickets by project
+      description: List all tickets for a specific project
+      operationId: listTicketsByProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          description: Project UUID
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          description: Filter by ticket status
+          schema:
+            type: string
+            enum: [draft, pending_review, approved, rejected, locked]
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+      responses:
+        '200':
+          description: List of tickets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================================================
+  # Ticket Endpoints
+  # ==========================================================================
+  /api/v1/tickets:
+    post:
+      tags: [Tickets]
+      summary: Create ticket
+      description: Create a new T&M or variation ticket
+      operationId: createTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTicketRequest'
+            example:
+              project_id: "123e4567-e89b-12d3-a456-426614174000"
+              ticket_type: "time_materials"
+              title: "Extra conduit run - Building B"
+              work_date: "2024-12-31"
+      responses:
+        '201':
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/tickets/{id}:
+    get:
+      tags: [Tickets]
+      summary: Get ticket
+      description: Get a specific ticket by ID
+      operationId: getTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+      responses:
+        '200':
+          description: Ticket details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Tickets]
+      summary: Update ticket
+      description: Update a draft ticket's details. Only draft tickets can be updated.
+      operationId: updateTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTicketRequest'
+      responses:
+        '200':
+          description: Ticket updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Ticket is locked and cannot be modified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "TICKET_LOCKED"
+                  message: "ticket is locked and cannot be modified"
+
+  /api/v1/tickets/{id}/submit:
+    post:
+      tags: [Tickets]
+      summary: Submit ticket for review
+      description: Submit a draft ticket for GC superintendent review and signature
+      operationId: submitTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+      responses:
+        '200':
+          description: Ticket submitted for review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "INVALID_TRANSITION"
+                  message: "cannot submit ticket in current status"
+
+  /api/v1/tickets/{id}/reject:
+    post:
+      tags: [Tickets]
+      summary: Reject ticket
+      description: Reject a ticket pending review (GC superintendent only)
+      operationId: rejectTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectTicketRequest'
+            example:
+              reason: "Quantities disputed - I counted 30 ft, not 50 ft"
+      responses:
+        '200':
+          description: Ticket rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/tickets/{id}/line-items:
+    get:
+      tags: [Tickets]
+      summary: List line items
+      description: Get all line items for a ticket
+      operationId: listLineItems
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+      responses:
+        '200':
+          description: List of line items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineItemListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Tickets]
+      summary: Add line item
+      description: Add a labor, material, or equipment line item to a draft ticket
+      operationId: addLineItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLineItemRequest'
+            example:
+              item_type: "labor"
+              description: "Electrician - overtime"
+              quantity: 4
+              unit: "hours"
+              unit_rate: 85.00
+      responses:
+        '201':
+          description: Line item added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineItemResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Ticket is locked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/tickets/{id}/line-items/{line_item_id}:
+    delete:
+      tags: [Tickets]
+      summary: Delete line item
+      description: Remove a line item from a draft ticket
+      operationId: deleteLineItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+        - name: line_item_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Line item deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Ticket is locked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========================================================================
+  # Photo Endpoints
+  # ==========================================================================
+  /api/v1/tickets/{id}/photos:
+    get:
+      tags: [Photos]
+      summary: List photos
+      description: Get all photos attached to a ticket
+      operationId: listPhotos
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+      responses:
+        '200':
+          description: List of photos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Photos]
+      summary: Upload photo
+      description: |
+        Upload a photo as evidence for a ticket.
+        
+        The client should:
+        1. Extract EXIF data (timestamp, GPS) before upload
+        2. Compute SHA-256 hash of the file
+        3. Compress to max 2048px, JPEG 80%
+        
+        The server verifies the hash to ensure integrity.
+      operationId: uploadPhoto
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+        - $ref: '#/components/parameters/idempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - client_hash
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: JPEG, PNG, or WebP image file (max 10MB)
+                caption:
+                  type: string
+                  maxLength: 500
+                  description: Optional caption for the photo
+                taken_at:
+                  type: string
+                  format: date-time
+                  description: When the photo was taken (from EXIF)
+                latitude:
+                  type: number
+                  format: double
+                  minimum: -90
+                  maximum: 90
+                  description: GPS latitude from EXIF
+                longitude:
+                  type: number
+                  format: double
+                  minimum: -180
+                  maximum: 180
+                  description: GPS longitude from EXIF
+                client_hash:
+                  type: string
+                  pattern: '^[a-f0-9]{64}$'
+                  description: SHA-256 hash of file for integrity verification
+      responses:
+        '201':
+          description: Photo uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoResponse'
+        '400':
+          description: Invalid file or hash mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Ticket is locked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/tickets/{id}/photos/{photo_id}:
+    delete:
+      tags: [Photos]
+      summary: Delete photo
+      description: Remove a photo from a draft ticket
+      operationId: deletePhoto
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+        - name: photo_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Photo deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Ticket is locked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========================================================================
+  # Voice Transcription Endpoints
+  # ==========================================================================
+  /api/v1/tickets/{id}/description/cleanup:
+    post:
+      tags: [Tickets]
+      summary: Clean up voice transcription
+      description: |
+        Send raw voice transcription for AI cleanup. The system will:
+        - Remove filler words (uh, um, like, you know)
+        - Fix grammar and punctuation
+        - Normalize to professional language
+        - Preserve all factual details
+        
+        Both raw and cleaned versions are stored for audit purposes.
+      operationId: cleanupTranscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanupTranscriptionRequest'
+            example:
+              raw_text: "uh we ran like 50 feet of extra conduit because the architect screwed up the drawings you know"
+      responses:
+        '200':
+          description: Transcription cleaned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupTranscriptionResponse'
+              example:
+                data:
+                  cleaned_text: "Ran 50 feet of extra conduit due to errors in the architectural drawings."
+                  raw_preserved: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Ticket is locked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: AI service unavailable (fallback to raw text)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========================================================================
+  # Signature Endpoints
+  # ==========================================================================
+  /api/v1/tickets/{id}/signature-request:
+    post:
+      tags: [Signatures]
+      summary: Request GC signature
+      description: |
+        Request a signature from the GC superintendent. 
+        
+        This will:
+        1. Generate a unique signing link
+        2. Send SMS and email to the GC with the link
+        3. Generate a 6-digit verification code for same-device fallback
+        
+        The GC can sign on their own device (recommended) or use SMS verification
+        to sign on the foreman's device.
+      operationId: requestSignature
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignatureRequestInput'
+            example:
+              signer_email: "gcsuper@contractor.com"
+              signer_phone: "+12025551234"
+      responses:
+        '201':
+          description: Signature request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignatureRequestResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Invalid ticket status (must be pending_review)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sign/{token}:
+    get:
+      tags: [Signatures]
+      summary: Get signing page data
+      description: |
+        Public endpoint to load ticket data for signing.
+        No authentication required - the token provides access.
+      operationId: getSigningData
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: Signing link token
+          schema:
+            type: string
+            minLength: 32
+      responses:
+        '200':
+          description: Signing page data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SigningPageData'
+        '404':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/signing-links/{token}/verify:
+    post:
+      tags: [Signatures]
+      summary: Verify SMS code
+      description: |
+        Verify the SMS code for same-device signing.
+        Required when GC signs on the foreman's device.
+        Max 3 attempts before the code is invalidated.
+      operationId: verifySmsCode
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifySmsCodeRequest'
+      responses:
+        '200':
+          description: Code verified, can proceed to sign
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      verified:
+                        type: boolean
+                        example: true
+        '400':
+          description: Invalid code or max attempts exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/signing-links/{token}/sign:
+    post:
+      tags: [Signatures]
+      summary: Submit signature
+      description: |
+        Submit a signature for a ticket.
+        
+        For same-device signing, the SMS code must be verified first.
+        
+        After signature:
+        1. Ticket status changes to approved
+        2. PDF is generated and locked
+        3. Email with PDF is sent to all parties
+      operationId: submitSignature
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitSignatureRequest'
+      responses:
+        '200':
+          description: Signature captured, ticket approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignatureResponse'
+        '400':
+          description: Invalid signature data or SMS not verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==========================================================================
+  # Verification Endpoint
+  # ==========================================================================
+  /api/v1/tickets/{id}/verify:
+    get:
+      tags: [Tickets]
+      summary: Verify ticket integrity
+      description: |
+        Verify the integrity of a locked ticket by checking:
+        - Content hash matches stored hash
+        - PDF hash matches stored hash
+        - Photo hashes match
+        - Audit chain is valid
+      operationId: verifyTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ticketId'
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyTicketResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  # ==========================================================================
+  # Security Schemes
+  # ==========================================================================
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token
+
+  # ==========================================================================
+  # Parameters
+  # ==========================================================================
+  parameters:
+    projectId:
+      name: id
+      in: path
+      required: true
+      description: Project UUID
+      schema:
+        type: string
+        format: uuid
+
+    ticketId:
+      name: id
+      in: path
+      required: true
+      description: Ticket UUID
+      schema:
+        type: string
+        format: uuid
+
+    limit:
+      name: limit
+      in: query
+      description: Number of items to return (max 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    offset:
+      name: offset
+      in: query
+      description: Number of items to skip
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+    idempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: Unique client-generated key to prevent duplicate operations
+      schema:
+        type: string
+        format: uuid
+
+  # ==========================================================================
+  # Responses
+  # ==========================================================================
+  responses:
+    Unauthorized:
+      description: Authentication required or token invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "UNAUTHORIZED"
+              message: "missing or invalid authorization header"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "NOT_FOUND"
+              message: "resource not found"
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: "VALIDATION_ERROR"
+              message: "validation failed"
+              details:
+                title: "is required"
+                work_date: "must be in YYYY-MM-DD format"
+
+  # ==========================================================================
+  # Schemas
+  # ==========================================================================
+  schemas:
+    # --------------------------------------------------------------------------
+    # Common
+    # --------------------------------------------------------------------------
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              description: Human-readable error message
+              example: "validation failed"
+            details:
+              type: object
+              description: Additional error details
+              additionalProperties: true
+
+    PaginationMetadata:
+      type: object
+      properties:
+        limit:
+          type: integer
+          example: 20
+        offset:
+          type: integer
+          example: 0
+        total:
+          type: integer
+          example: 42
+        has_more:
+          type: boolean
+          example: true
+
+    # --------------------------------------------------------------------------
+    # Health
+    # --------------------------------------------------------------------------
+    HealthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              example: "ok"
+            version:
+              type: string
+              example: "1.0.0"
+
+    ReadyResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              example: "ok"
+            database:
+              type: string
+              example: "ok"
+            storage:
+              type: string
+              example: "ok"
+
+    # --------------------------------------------------------------------------
+    # Auth
+    # --------------------------------------------------------------------------
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: "foreman@acmeelectric.com"
+        password:
+          type: string
+          minLength: 8
+          example: "securepassword123"
+
+    LoginResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            tokens:
+              $ref: '#/components/schemas/TokenPair'
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    TokenPair:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT access token (15 min expiry)
+        refresh_token:
+          type: string
+          description: Refresh token (30 day expiry)
+        expires_at:
+          type: string
+          format: date-time
+          description: Access token expiration time
+
+    CurrentUserResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user_id:
+              type: string
+              format: uuid
+            company_id:
+              type: string
+              format: uuid
+            role:
+              $ref: '#/components/schemas/Role'
+
+    # --------------------------------------------------------------------------
+    # User
+    # --------------------------------------------------------------------------
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        role:
+          $ref: '#/components/schemas/Role'
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Role:
+      type: string
+      enum: [foreman, gc_super, pm, accounting, admin]
+      description: |
+        User role:
+        - `foreman`: Creates tickets, takes photos, captures voice descriptions
+        - `gc_super`: Signs tickets on behalf of general contractor
+        - `pm`: Project manager, reviews tickets
+        - `accounting`: Views approved tickets for billing
+        - `admin`: Manages users and company settings
+
+    # --------------------------------------------------------------------------
+    # Project
+    # --------------------------------------------------------------------------
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+          nullable: true
+        gc_company_name:
+          type: string
+          nullable: true
+        gc_contact_email:
+          type: string
+          format: email
+          nullable: true
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        timezone:
+          type: string
+          example: "America/New_York"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProjectStatus:
+      type: string
+      enum: [active, completed, archived]
+
+    CreateProjectRequest:
+      type: object
+      required: [name, timezone]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        address:
+          type: string
+          maxLength: 500
+        gc_company_name:
+          type: string
+          maxLength: 200
+        gc_contact_email:
+          type: string
+          format: email
+        timezone:
+          type: string
+          example: "America/New_York"
+
+    UpdateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        address:
+          type: string
+          maxLength: 500
+        gc_company_name:
+          type: string
+          maxLength: 200
+        gc_contact_email:
+          type: string
+          format: email
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        timezone:
+          type: string
+
+    ProjectResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Project'
+
+    ProjectListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+
+    # --------------------------------------------------------------------------
+    # Ticket
+    # --------------------------------------------------------------------------
+    Ticket:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        created_by_id:
+          type: string
+          format: uuid
+        ticket_number:
+          type: string
+          example: "TM-2024-0042"
+        ticket_type:
+          $ref: '#/components/schemas/TicketType'
+        title:
+          type: string
+        description_raw:
+          type: string
+          nullable: true
+          description: Original voice transcription
+        description_cleaned:
+          type: string
+          nullable: true
+          description: AI-cleaned transcription
+        description_final:
+          type: string
+          nullable: true
+          description: User-edited final version
+        work_date:
+          type: string
+          format: date
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        gc_signed_at:
+          type: string
+          format: date-time
+          nullable: true
+        gc_signed_by_id:
+          type: string
+          format: uuid
+          nullable: true
+        rejected_at:
+          type: string
+          format: date-time
+          nullable: true
+        rejection_reason:
+          type: string
+          nullable: true
+        pdf_path:
+          type: string
+          nullable: true
+        pdf_hash:
+          type: string
+          nullable: true
+          description: SHA-256 hash of generated PDF
+        locked_at:
+          type: string
+          format: date-time
+          nullable: true
+        content_hash:
+          type: string
+          nullable: true
+          description: SHA-256 hash of all content at lock time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TicketType:
+      type: string
+      enum: [time_materials, variation]
+      description: |
+        - `time_materials`: T&M ticket for extra labor, materials, equipment
+        - `variation`: Change order / variation request
+
+    TicketStatus:
+      type: string
+      enum: [draft, pending_review, approved, rejected, locked]
+      description: |
+        Ticket workflow status:
+        - `draft`: Being created/edited by foreman
+        - `pending_review`: Submitted, waiting for GC signature
+        - `approved`: GC signed the ticket
+        - `rejected`: GC rejected the ticket (with reason)
+        - `locked`: PDF generated, ticket is immutable
+
+    CreateTicketRequest:
+      type: object
+      required: [project_id, ticket_type, title, work_date]
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        ticket_type:
+          $ref: '#/components/schemas/TicketType'
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        work_date:
+          type: string
+          format: date
+          description: Date work was performed (YYYY-MM-DD)
+
+    UpdateTicketRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description_final:
+          type: string
+          maxLength: 5000
+        work_date:
+          type: string
+          format: date
+
+    RejectTicketRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Reason for rejection
+
+    TicketResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Ticket'
+
+    TicketDetailResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/Ticket'
+            - type: object
+              properties:
+                line_items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/LineItem'
+                photos:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Photo'
+                signatures:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Signature'
+
+    TicketListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ticket'
+
+    CleanupTranscriptionRequest:
+      type: object
+      required: [raw_text]
+      properties:
+        raw_text:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: Raw voice transcription to clean up
+
+    CleanupTranscriptionResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            cleaned_text:
+              type: string
+            raw_preserved:
+              type: boolean
+              description: Whether the raw version was saved for audit
+
+    VerifyTicketResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            valid:
+              type: boolean
+            content_hash_match:
+              type: boolean
+            pdf_hash_match:
+              type: boolean
+            audit_chain_valid:
+              type: boolean
+            photo_hashes_valid:
+              type: boolean
+
+    # --------------------------------------------------------------------------
+    # Line Item
+    # --------------------------------------------------------------------------
+    LineItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_id:
+          type: string
+          format: uuid
+        item_type:
+          $ref: '#/components/schemas/LineItemType'
+        description:
+          type: string
+        quantity:
+          type: number
+          format: double
+        unit:
+          type: string
+          example: "hours"
+        unit_rate:
+          type: number
+          format: double
+          nullable: true
+        total:
+          type: number
+          format: double
+          nullable: true
+        sort_order:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    LineItemType:
+      type: string
+      enum: [labor, material, equipment]
+
+    CreateLineItemRequest:
+      type: object
+      required: [item_type, description, quantity, unit]
+      properties:
+        item_type:
+          $ref: '#/components/schemas/LineItemType'
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+        quantity:
+          type: number
+          format: double
+          minimum: 0.01
+        unit:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: "hours"
+        unit_rate:
+          type: number
+          format: double
+          minimum: 0
+        sort_order:
+          type: integer
+          default: 0
+
+    LineItemResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/LineItem'
+
+    LineItemListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+
+    # --------------------------------------------------------------------------
+    # Photo
+    # --------------------------------------------------------------------------
+    Photo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_id:
+          type: string
+          format: uuid
+        uploaded_by_id:
+          type: string
+          format: uuid
+        file_path:
+          type: string
+          description: Relative path to photo file
+        file_url:
+          type: string
+          format: uri
+          description: Full URL to access photo
+        thumbnail_url:
+          type: string
+          format: uri
+          description: URL to thumbnail version
+        file_size:
+          type: integer
+          description: File size in bytes
+        file_hash:
+          type: string
+          description: SHA-256 hash of file
+        mime_type:
+          type: string
+          example: "image/jpeg"
+        caption:
+          type: string
+          nullable: true
+        taken_at:
+          type: string
+          format: date-time
+          nullable: true
+        latitude:
+          type: number
+          format: double
+          nullable: true
+        longitude:
+          type: number
+          format: double
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    PhotoResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Photo'
+
+    PhotoListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Photo'
+
+    # --------------------------------------------------------------------------
+    # Signature
+    # --------------------------------------------------------------------------
+    Signature:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_id:
+          type: string
+          format: uuid
+        signer_type:
+          type: string
+          enum: [foreman, gc_super]
+        signer_name:
+          type: string
+        signer_email:
+          type: string
+          format: email
+          nullable: true
+        signing_method:
+          $ref: '#/components/schemas/SigningMethod'
+        signature_image:
+          type: string
+          description: Path to signature image
+        signed_at:
+          type: string
+          format: date-time
+
+    SigningMethod:
+      type: string
+      enum: [link_own_device, link_same_device, same_device_verified]
+      description: |
+        How the signature was captured:
+        - `link_own_device`: GC opened link on their own device (most secure)
+        - `link_same_device`: GC used link on foreman's device with SMS verify
+        - `same_device_verified`: Same device with SMS verification
+
+    SignatureRequestInput:
+      type: object
+      required: [signer_email, signer_phone]
+      properties:
+        signer_email:
+          type: string
+          format: email
+          description: GC superintendent's email address
+        signer_phone:
+          type: string
+          pattern: '^\+[1-9]\d{1,14}$'
+          description: GC superintendent's phone (E.164 format)
+          example: "+12025551234"
+
+    SignatureRequestResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            signing_link_id:
+              type: string
+              format: uuid
+            expires_at:
+              type: string
+              format: date-time
+            sent_via:
+              type: array
+              items:
+                type: string
+                enum: [sms, email]
+
+    SigningPageData:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            ticket:
+              $ref: '#/components/schemas/Ticket'
+            line_items:
+              type: array
+              items:
+                $ref: '#/components/schemas/LineItem'
+            photos:
+              type: array
+              items:
+                $ref: '#/components/schemas/Photo'
+            signer_email:
+              type: string
+            expires_at:
+              type: string
+              format: date-time
+
+    VerifySmsCodeRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^\d{6}$'
+          description: 6-digit verification code from SMS
+
+    SubmitSignatureRequest:
+      type: object
+      required: [signer_name, signature_image, acknowledgment]
+      properties:
+        signer_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Signer's full name
+        signature_image:
+          type: string
+          description: Base64-encoded PNG of signature
+          example: "data:image/png;base64,iVBORw0..."
+        acknowledgment:
+          type: boolean
+          description: Must be true to confirm legal acknowledgment
+
+    SignatureResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            signature:
+              $ref: '#/components/schemas/Signature'
+            ticket:
+              $ref: '#/components/schemas/Ticket'
+            pdf_url:
+              type: string
+              format: uri
+              description: URL to download the locked PDF
+
