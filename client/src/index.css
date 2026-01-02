@@ -1,0 +1,341 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SITEPROOF - Industrial Construction Design System
+   Built with shadcn/ui + Custom Construction Brand
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Google Fonts - Industrial Typography */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Tailwind v4 Theme Extensions
+   ───────────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Charcoal Scale - Construction Grays */
+  --color-charcoal-950: #0a0a0b;
+  --color-charcoal-900: #111113;
+  --color-charcoal-800: #1a1a1d;
+  --color-charcoal-700: #252529;
+  --color-charcoal-600: #35353b;
+  --color-charcoal-500: #4a4a52;
+  --color-charcoal-400: #6b6b75;
+  --color-charcoal-300: #9090a0;
+  --color-charcoal-200: #b8b8c5;
+  --color-charcoal-100: #e0e0e8;
+  --color-charcoal-50: #f5f5f7;
+
+  /* Safety Orange - Primary Brand */
+  --color-safety-700: #cc5400;
+  --color-safety-600: #e55f00;
+  --color-safety-500: #ff6b00;
+  --color-safety-400: #ff8534;
+  --color-safety-300: #ffa366;
+  --color-safety-200: #ffc299;
+  --color-safety-100: #ffe0cc;
+  --color-safety-50: #fff5eb;
+
+  /* Fonts */
+  --font-display: 'Bebas Neue', system-ui, sans-serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+
+  /* Radius - Slightly rounded for industrial feel */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.75rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   shadcn/ui CSS Variables - Light Mode (Construction Theme)
+   ───────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Core Backgrounds */
+  --background: 245 245 247;          /* charcoal-50 */
+  --foreground: 17 17 19;             /* charcoal-900 */
+
+  /* Card surfaces */
+  --card: 255 255 255;
+  --card-foreground: 17 17 19;
+
+  /* Popover/Dropdown */
+  --popover: 255 255 255;
+  --popover-foreground: 17 17 19;
+
+  /* Primary - Safety Orange */
+  --primary: 255 107 0;               /* safety-500 */
+  --primary-foreground: 255 255 255;
+
+  /* Secondary - Charcoal */
+  --secondary: 224 224 232;           /* charcoal-100 */
+  --secondary-foreground: 17 17 19;
+
+  /* Muted */
+  --muted: 224 224 232;
+  --muted-foreground: 107 107 117;    /* charcoal-400 */
+
+  /* Accent */
+  --accent: 255 229 204;              /* safety-100 */
+  --accent-foreground: 204 84 0;      /* safety-700 */
+
+  /* Destructive */
+  --destructive: 239 68 68;
+  --destructive-foreground: 255 255 255;
+
+  /* Borders & Inputs */
+  --border: 184 184 197;              /* charcoal-200 */
+  --input: 184 184 197;
+  --ring: 255 107 0;                  /* safety-500 */
+
+  /* Chart colors */
+  --chart-1: 255 107 0;
+  --chart-2: 34 197 94;
+  --chart-3: 59 130 246;
+  --chart-4: 234 179 8;
+  --chart-5: 168 85 247;
+
+  /* Sidebar */
+  --sidebar: 255 255 255;
+  --sidebar-foreground: 17 17 19;
+  --sidebar-primary: 255 107 0;
+  --sidebar-primary-foreground: 255 255 255;
+  --sidebar-accent: 245 245 247;
+  --sidebar-accent-foreground: 17 17 19;
+  --sidebar-border: 224 224 232;
+  --sidebar-ring: 255 107 0;
+
+  /* Radius */
+  --radius: 0.5rem;
+
+  /* Custom - Legacy support */
+  --bg-primary: #f5f5f7;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e0e0e8;
+  --text-primary: #111113;
+  --text-secondary: #4a4a52;
+  --text-tertiary: #6b6b75;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Dark Mode - Industrial Night Shift
+   ───────────────────────────────────────────────────────────────────────────── */
+.dark {
+  /* Core Backgrounds */
+  --background: 10 10 11;             /* charcoal-950 */
+  --foreground: 245 245 247;          /* charcoal-50 */
+
+  /* Card surfaces */
+  --card: 17 17 19;                   /* charcoal-900 */
+  --card-foreground: 245 245 247;
+
+  /* Popover/Dropdown */
+  --popover: 26 26 29;                /* charcoal-800 */
+  --popover-foreground: 245 245 247;
+
+  /* Primary - Safety Orange (stays bright) */
+  --primary: 255 107 0;
+  --primary-foreground: 255 255 255;
+
+  /* Secondary */
+  --secondary: 37 37 41;              /* charcoal-700 */
+  --secondary-foreground: 245 245 247;
+
+  /* Muted */
+  --muted: 26 26 29;
+  --muted-foreground: 144 144 160;    /* charcoal-300 */
+
+  /* Accent */
+  --accent: 37 37 41;
+  --accent-foreground: 255 133 52;    /* safety-400 */
+
+  /* Destructive */
+  --destructive: 220 38 38;
+  --destructive-foreground: 255 255 255;
+
+  /* Borders & Inputs */
+  --border: 37 37 41;                 /* charcoal-700 */
+  --input: 53 53 59;                  /* charcoal-600 */
+  --ring: 255 107 0;
+
+  /* Sidebar */
+  --sidebar: 17 17 19;
+  --sidebar-foreground: 245 245 247;
+  --sidebar-primary: 255 107 0;
+  --sidebar-primary-foreground: 255 255 255;
+  --sidebar-accent: 26 26 29;
+  --sidebar-accent-foreground: 245 245 247;
+  --sidebar-border: 37 37 41;
+  --sidebar-ring: 255 107 0;
+
+  /* Custom - Legacy support */
+  --bg-primary: #0a0a0b;
+  --bg-secondary: #111113;
+  --bg-tertiary: #1a1a1d;
+  --text-primary: #f5f5f7;
+  --text-secondary: #9090a0;
+  --text-tertiary: #6b6b75;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Base Styles
+   ───────────────────────────────────────────────────────────────────────────── */
+* {
+  border-color: rgb(var(--border));
+}
+
+html {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
+  min-height: 100vh;
+  line-height: 1.5;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Industrial Grain Texture Overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.012;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.dark body::before {
+  opacity: 0.025;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Typography - Industrial Headlines
+   ───────────────────────────────────────────────────────────────────────────── */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  margin: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Construction Tape Accent - Signature Brand Element
+   ───────────────────────────────────────────────────────────────────────────── */
+.construction-tape {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgb(var(--primary)),
+    rgb(var(--primary)) 10px,
+    #111113 10px,
+    #111113 20px
+  );
+  height: 8px;
+}
+
+.construction-tape-sm {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgb(var(--primary)),
+    rgb(var(--primary)) 6px,
+    #111113 6px,
+    #111113 12px
+  );
+  height: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Custom Scrollbar - Industrial Style
+   ───────────────────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--muted-foreground));
+  border-radius: 5px;
+  border: 2px solid rgb(var(--muted));
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--foreground) / 0.5);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Focus & Selection - High Visibility for Field Use
+   ───────────────────────────────────────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid rgb(var(--ring));
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgb(var(--primary));
+  color: white;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Animations - Subtle Industrial Motion
+   ───────────────────────────────────────────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--primary) / 0.4); }
+  50% { box-shadow: 0 0 20px 5px rgb(var(--primary) / 0.2); }
+}
+
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-accordion-down {
+  animation: accordion-down 0.2s ease-out;
+}
+
+.animate-accordion-up {
+  animation: accordion-up 0.2s ease-out;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Utility Classes
+   ───────────────────────────────────────────────────────────────────────────── */
+.bg-primary-brand { background-color: var(--bg-primary); }
+.bg-secondary-brand { background-color: var(--bg-secondary); }
+.text-primary-brand { color: var(--text-primary); }
+.text-secondary-brand { color: var(--text-secondary); }
