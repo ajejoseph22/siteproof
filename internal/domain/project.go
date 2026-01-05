@@ -76,4 +76,3 @@ type UpdateProjectInput struct {
 	Status         *ProjectStatus
 	Timezone       *string
 }
-

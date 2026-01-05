@@ -136,4 +136,3 @@ func (i *LoginInput) Validate() error {
 	}
 	return nil
 }
-

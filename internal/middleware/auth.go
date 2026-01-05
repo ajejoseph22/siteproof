@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/yourusername/siteproof/internal/domain"
-	"github.com/yourusername/siteproof/internal/handler"
-	"github.com/yourusername/siteproof/internal/service"
+	"github.com/ajejoseph22/siteproof/internal/domain"
+	"github.com/ajejoseph22/siteproof/internal/httputil"
+	"github.com/ajejoseph22/siteproof/internal/service"
 )
 
 // contextKey is a custom type for context keys.
@@ -29,14 +29,14 @@ func Auth(authService *service.AuthService) func(http.Handler) http.Handler {
 			// Get token from header
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
-				handler.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing authorization header")
+				httputil.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "missing authorization header")
 				return
 			}
 
 			// Parse Bearer token
 			parts := strings.SplitN(authHeader, " ", 2)
 			if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
-				handler.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "invalid authorization header format")
+				httputil.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "invalid authorization header format")
 				return
 			}
 
@@ -44,10 +44,10 @@ func Auth(authService *service.AuthService) func(http.Handler) http.Handler {
 			claims, err := authService.ValidateAccessToken(parts[1])
 			if err != nil {
 				if err == domain.ErrExpiredToken {
-					handler.WriteError(w, http.StatusUnauthorized, "TOKEN_EXPIRED", "access token has expired")
+					httputil.WriteError(w, http.StatusUnauthorized, "TOKEN_EXPIRED", "access token has expired")
 					return
 				}
-				handler.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "invalid access token")
+				httputil.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "invalid access token")
 				return
 			}
 
@@ -73,12 +73,12 @@ func RequireRole(roles ...domain.Role) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			role, ok := RoleFromContext(r.Context())
 			if !ok {
-				handler.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "not authenticated")
+				httputil.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "not authenticated")
 				return
 			}
 
 			if !roleSet[role] {
-				handler.WriteError(w, http.StatusForbidden, "FORBIDDEN", "insufficient permissions")
+				httputil.WriteError(w, http.StatusForbidden, "FORBIDDEN", "insufficient permissions")
 				return
 			}
 
@@ -104,4 +104,3 @@ func RoleFromContext(ctx context.Context) (domain.Role, bool) {
 	role, ok := ctx.Value(roleKey).(domain.Role)
 	return role, ok
 }
-

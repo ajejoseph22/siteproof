@@ -199,4 +199,3 @@ func (i *CreateLineItemInput) Validate() error {
 	}
 	return nil
 }
-

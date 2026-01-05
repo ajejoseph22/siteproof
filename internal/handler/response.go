@@ -91,4 +91,3 @@ func WritePaginated(w http.ResponseWriter, data interface{}, limit, offset, tota
 func DecodeJSON(r *http.Request, v interface{}) error {
 	return json.NewDecoder(r.Body).Decode(v)
 }
-

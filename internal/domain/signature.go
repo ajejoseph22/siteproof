@@ -171,4 +171,3 @@ func (i *CreateSignatureInput) Validate() error {
 	}
 	return nil
 }
-

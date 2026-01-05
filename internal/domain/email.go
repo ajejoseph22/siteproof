@@ -44,4 +44,3 @@ type CreateEmailEventInput struct {
 	Subject   string
 	Template  *string
 }
-

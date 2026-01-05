@@ -45,9 +45,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    # Uncomment to expose for local development
-    # ports:
-    #   - "5432:5432"
+    ports:
+      - "5433:5432"
 
   migrate:
     image: migrate/migrate:v4.17.0

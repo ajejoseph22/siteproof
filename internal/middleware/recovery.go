@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"github.com/yourusername/siteproof/internal/handler"
+	"github.com/ajejoseph22/siteproof/internal/httputil"
 )
 
 // Recovery creates a panic recovery middleware.
@@ -21,7 +21,7 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 						slog.String("path", r.URL.Path),
 					)
 
-					handler.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+					httputil.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 				}
 			}()
 
@@ -29,4 +29,3 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 		})
 	}
 }
-

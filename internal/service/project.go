@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/yourusername/siteproof/internal/domain"
+	"github.com/ajejoseph22/siteproof/internal/domain"
 )
 
 // ProjectService handles project operations.
@@ -159,4 +159,3 @@ func (s *ProjectService) Update(ctx context.Context, id uuid.UUID, input *domain
 
 	return &project, nil
 }
-

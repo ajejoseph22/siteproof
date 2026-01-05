@@ -74,4 +74,3 @@ func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
-

@@ -6,9 +6,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
-	"github.com/yourusername/siteproof/internal/domain"
-	"github.com/yourusername/siteproof/internal/middleware"
-	"github.com/yourusername/siteproof/internal/service"
+	"github.com/ajejoseph22/siteproof/internal/domain"
+	"github.com/ajejoseph22/siteproof/internal/middleware"
+	"github.com/ajejoseph22/siteproof/internal/service"
 )
 
 // ProjectHandler handles project endpoints.
@@ -180,4 +180,3 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	WriteJSON(w, http.StatusOK, project)
 }
-

@@ -1,4 +1,4 @@
-module github.com/yourusername/siteproof
+module github.com/ajejoseph22/siteproof
 
 go 1.22
 
@@ -9,7 +9,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/joho/godotenv v1.5.1
-	github.com/sony/gobreaker v1.0.0
 	golang.org/x/crypto v0.28.0
 )
 
@@ -20,4 +19,3 @@ require (
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
 )
-

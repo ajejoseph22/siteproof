@@ -16,10 +16,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
-	"github.com/yourusername/siteproof/internal/config"
-	"github.com/yourusername/siteproof/internal/handler"
-	"github.com/yourusername/siteproof/internal/middleware"
-	"github.com/yourusername/siteproof/internal/service"
+	"github.com/ajejoseph22/siteproof/internal/config"
+	"github.com/ajejoseph22/siteproof/internal/handler"
+	"github.com/ajejoseph22/siteproof/internal/middleware"
+	"github.com/ajejoseph22/siteproof/internal/service"
 )
 
 // Version is set at build time.
@@ -172,4 +172,3 @@ func main() {
 
 	logger.Info("server stopped")
 }
-

@@ -39,4 +39,3 @@ func (i *CreateCompanyInput) Validate() error {
 	}
 	return nil
 }
-

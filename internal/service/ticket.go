@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/yourusername/siteproof/internal/domain"
+	"github.com/ajejoseph22/siteproof/internal/domain"
 )
 
 // TicketService handles ticket operations.
@@ -309,4 +309,3 @@ func (s *TicketService) Lock(ctx context.Context, id uuid.UUID, pdfPath, pdfHash
 
 	return &updated, nil
 }
-

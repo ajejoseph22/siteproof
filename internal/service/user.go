@@ -8,8 +8,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/yourusername/siteproof/internal/domain"
-	"github.com/yourusername/siteproof/pkg/crypto"
+	"github.com/ajejoseph22/siteproof/internal/domain"
+	"github.com/ajejoseph22/siteproof/pkg/crypto"
 )
 
 // UserService handles user operations.
@@ -177,4 +177,3 @@ func (s *UserService) Delete(ctx context.Context, id uuid.UUID) error {
 
 	return nil
 }
-

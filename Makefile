@@ -20,7 +20,7 @@ MIGRATIONS_PATH ?= migrations
 # DATABASE COMMANDS
 # =============================================================================
 
-.PHONY: db-migrate-up db-migrate-down db-migrate-version db-migrate-force db-migrate-create db-reset db-psql
+.PHONY: db-migrate-up db-migrate-down db-migrate-version db-migrate-force db-migrate-create db-reset db-psqlainer
 
 ## db-migrate-up: Apply all pending migrations
 db-migrate-up:
@@ -77,6 +77,20 @@ db-dump:
 	@mkdir -p backups
 	pg_dump "$(DATABASE_URL)" > backups/siteproof-$(shell date +%Y%m%d-%H%M%S).sql
 	@echo "Database dumped to backups/"
+
+## db-seed: Seed database with dev/test data (WARNING: clears existing data)
+db-seed:
+	@echo "WARNING: This will clear existing data!"
+	@read -p "Continue? [y/N] " confirm && [ "$$confirm" = "y" ]
+	psql "$(DATABASE_URL)" -f scripts/seed.sql
+	@echo "Database seeded successfully"
+
+## db-seed-docker: Seed database in Docker container
+db-seed-docker:
+	@echo "WARNING: This will clear existing data!"
+	@read -p "Continue? [y/N] " confirm && [ "$$confirm" = "y" ]
+	docker compose exec -T db psql -U siteproof -d siteproof < scripts/seed.sql
+	@echo "Database seeded successfully"
 
 # =============================================================================
 # DOCKER COMMANDS
@@ -169,6 +183,8 @@ help:
 	@echo "  make db-migrate-version  Show current migration version"
 	@echo "  make db-migrate-create NAME=xyz  Create new migration"
 	@echo "  make db-reset            Drop and recreate database"
+	@echo "  make db-seed             Seed with dev data (dev/test)"
+	@echo "  make db-seed-docker      Seed with dev data (Docker)"
 	@echo "  make db-psql             Open psql shell"
 	@echo "  make db-dump             Dump database to file"
 	@echo ""

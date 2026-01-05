@@ -32,4 +32,3 @@ func RequestIDFromContext(ctx context.Context) string {
 	id, _ := ctx.Value(requestIDKey).(string)
 	return id
 }
-

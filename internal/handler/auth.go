@@ -3,9 +3,9 @@ package handler
 import (
 	"net/http"
 
-	"github.com/yourusername/siteproof/internal/domain"
-	"github.com/yourusername/siteproof/internal/middleware"
-	"github.com/yourusername/siteproof/internal/service"
+	"github.com/ajejoseph22/siteproof/internal/domain"
+	"github.com/ajejoseph22/siteproof/internal/middleware"
+	"github.com/ajejoseph22/siteproof/internal/service"
 )
 
 // AuthHandler handles authentication endpoints.
@@ -131,4 +131,3 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		"role":       role,
 	})
 }
-

@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/yourusername/siteproof/internal/config"
-	"github.com/yourusername/siteproof/internal/domain"
-	"github.com/yourusername/siteproof/pkg/crypto"
+	"github.com/ajejoseph22/siteproof/internal/config"
+	"github.com/ajejoseph22/siteproof/internal/domain"
+	"github.com/ajejoseph22/siteproof/pkg/crypto"
 )
 
 // AuthService handles authentication operations.
@@ -218,4 +218,3 @@ func (s *AuthService) generateTokenPair(user *domain.User, deviceName string) (*
 		ExpiresAt:    accessExpiry,
 	}, nil
 }
-

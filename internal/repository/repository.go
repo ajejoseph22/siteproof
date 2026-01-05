@@ -85,4 +85,3 @@ func Connect(ctx context.Context, databaseURL string, maxConns int32) (*Reposito
 
 	return New(pool), nil
 }
-

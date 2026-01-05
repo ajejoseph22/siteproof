@@ -38,10 +38,10 @@ type DatabaseConfig struct {
 
 // JWTConfig holds JWT token configuration.
 type JWTConfig struct {
-	Secret           string
-	AccessTokenTTL   time.Duration
-	RefreshTokenTTL  time.Duration
-	Issuer           string
+	Secret          string
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
+	Issuer          string
 }
 
 // OpenAIConfig holds OpenAI API configuration.
@@ -53,10 +53,10 @@ type OpenAIConfig struct {
 
 // PostmarkConfig holds Postmark email API configuration.
 type PostmarkConfig struct {
-	APIKey      string
-	FromEmail   string
-	FromName    string
-	Timeout     time.Duration
+	APIKey    string
+	FromEmail string
+	FromName  string
+	Timeout   time.Duration
 }
 
 // TwilioConfig holds Twilio SMS API configuration.
@@ -191,4 +191,3 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 	}
 	return defaultValue
 }
-

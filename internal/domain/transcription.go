@@ -70,4 +70,3 @@ func (i *CreateTranscriptionVersionInput) Validate() error {
 	}
 	return nil
 }
-

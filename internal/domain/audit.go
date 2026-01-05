@@ -12,17 +12,17 @@ import (
 type AuditAction string
 
 const (
-	AuditActionCreated           AuditAction = "created"
-	AuditActionUpdated           AuditAction = "updated"
-	AuditActionDeleted           AuditAction = "deleted"
-	AuditActionSigned            AuditAction = "signed"
-	AuditActionLocked            AuditAction = "locked"
-	AuditActionRejected          AuditAction = "rejected"
-	AuditActionPhotoAdded        AuditAction = "photo_added"
+	AuditActionCreated            AuditAction = "created"
+	AuditActionUpdated            AuditAction = "updated"
+	AuditActionDeleted            AuditAction = "deleted"
+	AuditActionSigned             AuditAction = "signed"
+	AuditActionLocked             AuditAction = "locked"
+	AuditActionRejected           AuditAction = "rejected"
+	AuditActionPhotoAdded         AuditAction = "photo_added"
 	AuditActionDescriptionCleaned AuditAction = "description_cleaned"
-	AuditActionEmailSent         AuditAction = "email_sent"
-	AuditActionLogin             AuditAction = "login"
-	AuditActionLogout            AuditAction = "logout"
+	AuditActionEmailSent          AuditAction = "email_sent"
+	AuditActionLogin              AuditAction = "login"
+	AuditActionLogout             AuditAction = "logout"
 )
 
 // AuditLog represents an immutable audit log entry.
@@ -57,9 +57,8 @@ type ChangeValue struct {
 
 // ToJSON converts changes to JSON for storage.
 func (i *CreateAuditLogInput) ToJSON() (json.RawMessage, error) {
-	if i.Changes == nil || len(i.Changes) == 0 {
+	if len(i.Changes) == 0 {
 		return nil, nil
 	}
 	return json.Marshal(i.Changes)
 }
-

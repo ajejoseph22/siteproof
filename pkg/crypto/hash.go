@@ -62,4 +62,3 @@ func GenerateVerificationCode() (string, error) {
 	code := (int(b[0])<<16 | int(b[1])<<8 | int(b[2])) % 1000000
 	return fmt.Sprintf("%06d", code), nil
 }
-

@@ -75,4 +75,3 @@ func NewDomainError(err error, code, message string) *DomainError {
 		Message: message,
 	}
 }
-

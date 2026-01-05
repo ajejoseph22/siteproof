@@ -48,4 +48,3 @@ func Logging(logger *slog.Logger) func(http.Handler) http.Handler {
 		})
 	}
 }
-
