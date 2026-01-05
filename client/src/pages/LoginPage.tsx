@@ -233,7 +233,7 @@ export function LoginPage() {
 
       {/* Footer */}
       <footer className="relative text-center p-4 text-sm text-charcoal-500 dark:text-charcoal-400">
-        <p>&copy; 2024 SiteProof. Built for construction professionals.</p>
+        <p>&copy; {new Date().getFullYear()} SiteProof. Built for construction professionals.</p>
       </footer>
     </div>
   );
