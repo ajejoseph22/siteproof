@@ -95,10 +95,16 @@ jobs:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_HOSTS: ${{ vars.VPS_HOSTS }}
           SSH_USER: ${{ secrets.SSH_USER }}
+          REGISTRY_USERNAME: ${{ vars.REGISTRY_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
           set -e
           if [ -z "$VPS_SSH_KEY" ] || [ -z "$VPS_HOSTS" ]; then
             echo "Missing VPS_SSH_KEY or VPS_HOSTS secrets."
+            exit 1
+          fi
+          if [ -z "$REGISTRY_USERNAME" ] || [ -z "$REGISTRY_TOKEN" ]; then
+            echo "Missing REGISTRY_USERNAME or REGISTRY_TOKEN secrets."
             exit 1
           fi
 
@@ -110,5 +116,5 @@ jobs:
 
           for host in ${VPS_HOSTS//,/ }; do
             ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no "$SSH_USER@$host" \
-              "cd /opt/siteproof && git pull --ff-only && API_IMAGE=$API_IMAGE_TAG docker compose -f docker-compose.prod.yml pull && API_IMAGE=$API_IMAGE_TAG docker compose -f docker-compose.prod.yml up -d"
+              "cd /opt/siteproof && git pull --ff-only && printf '%s' \"$REGISTRY_TOKEN\" | docker login $REGISTRY -u \"$REGISTRY_USERNAME\" --password-stdin && API_IMAGE=$API_IMAGE_TAG docker compose -f docker-compose.prod.yml pull && API_IMAGE=$API_IMAGE_TAG docker compose -f docker-compose.prod.yml up -d"
           done
