@@ -37,7 +37,7 @@ jobs:
       - name: Setup sqlc
         uses: sqlc-dev/setup-sqlc@v3
         with:
-          version: "1.26.0"
+          sqlc-version: "1.26.0"
 
       - name: SQLC compile
         run: sqlc compile
