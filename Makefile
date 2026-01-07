@@ -130,7 +130,8 @@ dev:
 
 ## test: Run all tests
 test:
-	go test -v ./...
+	@mkdir -p .cache/go-build
+	GOCACHE=$(CURDIR)/.cache/go-build go test -v ./...
 
 ## lint: Run linters
 lint:
@@ -205,4 +206,3 @@ help:
 	@echo "  make build-docker        Build Docker image"
 
 .DEFAULT_GOAL := help
-

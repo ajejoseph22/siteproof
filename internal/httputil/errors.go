@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/ajejoseph22/siteproof/internal/domain"
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const (

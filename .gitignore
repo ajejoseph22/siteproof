@@ -37,6 +37,7 @@ dist/
 
 # Temporary files
 tmp/
+.cache/
 *.tmp
 *.log
 
@@ -49,4 +50,3 @@ internal/repository/db/*.go
 
 # Docker
 docker-compose.override.yml
-
