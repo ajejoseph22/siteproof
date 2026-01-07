@@ -244,7 +244,16 @@
       "Return 404 for missing or unauthorized files",
       "Add tests for access control on file downloads"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Added GET /api/v1/files/photos/{photo_id}, /files/signatures/{signature_id}, and /files/pdfs/{ticket_id} endpoints.",
+      "FileService queries join through tickets table to enforce company_id scoping, returning 404 for cross-company access.",
+      "serveFile sets Content-Type from stored MIME type, ETag from file hash, and Cache-Control: private, max-age=3600.",
+      "Path traversal protection via absolute path prefix validation.",
+      "PDF downloads include Content-Disposition: attachment header.",
+      "Conditional requests with If-None-Match return 304 Not Modified when hash matches.",
+      "Handler tests cover: not found, cross-company denied, invalid ID, unauthenticated, success, conditional requests, path traversal, storage not configured."
+    ]
   },
   {
     "category": "backend",

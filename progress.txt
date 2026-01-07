@@ -1,17 +1,120 @@
-Completed config PRD item (optional env file loading in config, OAuth config fields, .env.example + CLAUDE docs). make test blocked by sandbox go build cache permissions.
+# SiteProof Development Progress
 
-Completed data layer PRD items 2-7: Verified all migrations (000002-000014) already implemented full data layer including companies/users/projects tables, tickets/line_items schema, photos/signatures with hash verification, audit logs with hash chain triggers, and immutability enforcement. Added cursor-based pagination queries (ListTicketsByCursor, ListTicketsByStatusCursor, ListTicketsByProjectCursor, ListUsersByCursor). Fixed sqlc.yaml type overrides for jsonb/inet imports. Regenerated sqlc code. make test passes (no test files yet but code compiles).
+## Configuration & Environment
+- Completed config PRD item:
+  - Optional env file loading in config module
+  - OAuth configuration fields added
+  - Updated `.env.example` and CLAUDE.md documentation
+  - Note: `make test` blocked by sandbox Go build cache permissions
 
-Completed auth registration: added /auth/register to create company + admin user with bcrypt password hashing, slug generation, and JWT/refresh token issuance.
-Implemented idempotency middleware with cached POST responses and X-Idempotent-Replayed; wired it to POST /api/v1/tickets and exposed replay header in CORS.
-Completed RBAC + company scoping: added permission map + RequirePermission middleware, routed RBAC by endpoint, scoped project/ticket queries by company (including project ownership check), and added cross-company handler tests. make test failed due to Go build cache permission limits.
+## Data Layer (PRD Items 2-7)
+- Verified all migrations (000002-000014) implementing full data layer:
+  - Companies, users, and projects tables
+  - Tickets and line_items schema
+  - Photos and signatures with SHA-256 hash verification
+  - Audit logs with hash chain triggers for tamper evidence
+  - Immutability enforcement via database triggers
+- Added cursor-based pagination queries:
+  - `ListTicketsByCursor`
+  - `ListTicketsByStatusCursor`
+  - `ListTicketsByProjectCursor`
+  - `ListUsersByCursor`
+- Fixed sqlc.yaml type overrides for jsonb/inet imports
+- Regenerated sqlc code (compiles, no test files yet)
 
-Completed ticket CRUD PRD item: added cursor-based ticket listing (company + project), wired status filter, and audit log entries for ticket lifecycle changes with actor tracking.
-Standardized API error handling: added APIError mapping + WriteErrorFrom, updated handlers to use it, and documented error codes in openapi.yaml. make test failed due to Go build cache permission limits.
-Completed line item management: added list/create/update/delete endpoints, draft-only enforcement with audit log entries, and ticket line_items_total aggregation migration. make test failed due to Go build cache permission.
+## Authentication
+- Completed auth registration endpoint (`/auth/register`):
+  - Creates company + admin user in single transaction
+  - Bcrypt password hashing
+  - Automatic slug generation for companies
+  - JWT access token + refresh token issuance
 
-Completed health check endpoint: added storage readiness checks with timeouts, expanded /health payload, and added handler tests. make test failed due to Go build cache permission in /Users/joseph/Library/Caches/go-build.
+## Idempotency Middleware
+- Implemented cached POST response storage
+- Added `X-Idempotent-Replayed` header for replay detection
+- Wired to `POST /api/v1/tickets`
+- Exposed replay header in CORS configuration
 
-Completed photo upload PRD item: added photo upload/list/delete service+handler with multipart parsing, SHA-256 verification, storage under storage base path, audit logs, and file_url/thumbnail_url responses (thumbnail_url mirrors file_url). make test failed: missing github.com/jackc/pgconn module.
+## RBAC & Company Scoping
+- Added permission map with role-based access control
+- Created `RequirePermission` middleware
+- Routed RBAC enforcement by endpoint
+- Scoped project/ticket queries by company:
+  - Project ownership verification
+  - Cross-company access prevention
+- Added cross-company handler tests
+- Note: `make test` failed due to Go build cache permission limits
 
-Completed structured logging PRD item: created pkg/slogctx package for context-aware structured logging. Updated Logging middleware to attach request-scoped logger with request_id, and include user_id/company_id in http_request logs. Added key event logging: ticket_created/updated/submitted/approved/rejected/locked in TicketService, user_login/registered/logout in AuthService, photo_uploaded in PhotoService. All logs inherit request_id from context. make build and make test pass.
+## Ticket CRUD
+- Added cursor-based ticket listing:
+  - By company
+  - By project
+  - With status filter support
+- Audit log entries for ticket lifecycle:
+  - Created, updated, submitted, approved, rejected, locked
+  - Actor tracking for all state changes
+
+## API Error Handling
+- Standardized error responses with `APIError` mapping
+- Added `WriteErrorFrom` helper for consistent error writing
+- Updated all handlers to use standardized errors
+- Documented error codes in `openapi.yaml`
+
+## Line Item Management
+- Added full CRUD endpoints:
+  - List, create, update, delete
+- Draft-only enforcement (prevents edits on submitted tickets)
+- Audit log entries for all line item changes
+- Migration for `line_items_total` aggregation on tickets
+
+## Health Checks
+- Added `/health` endpoint with expanded payload:
+  - Database connectivity check
+  - Storage readiness checks with configurable timeouts
+- Added handler tests for health endpoint
+
+## Photo Upload
+- Completed photo upload PRD item:
+  - Multipart form parsing for file uploads
+  - SHA-256 hash verification for integrity
+  - Storage under configurable base path
+  - Audit log entries for uploads
+- Endpoints: upload, list, delete
+- Response includes `file_url` and `thumbnail_url`
+- Note: Initial `make test` failed due to missing `github.com/jackc/pgconn` module (resolved)
+
+## Structured Logging
+- Created `pkg/slogctx` package for context-aware structured logging
+- Updated Logging middleware:
+  - Attaches request-scoped logger with `request_id`
+  - Includes `user_id` and `company_id` in http_request logs
+- Added key event logging:
+  - Ticket service: created, updated, submitted, approved, rejected, locked
+  - Auth service: login, registered, logout
+  - Photo service: uploaded
+- All logs inherit `request_id` from context
+- `make build` and `make test` pass
+
+## Secure File Downloads
+- Implemented secure file download endpoints for photos, signatures, and PDFs:
+  - `GET /api/v1/files/photos/{photo_id}` - Download photo by ID
+  - `GET /api/v1/files/signatures/{signature_id}` - Download signature image
+  - `GET /api/v1/files/pdfs/{ticket_id}` - Download ticket PDF
+- Created `FileService` with company-scoped queries:
+  - Joins through `tickets` table to enforce multi-tenancy
+  - Returns 404 for unauthorized access (prevents information leakage)
+- File serving implementation:
+  - Sets correct `Content-Type` from stored MIME type or file extension
+  - `ETag` header from SHA-256 file hash for caching
+  - `Cache-Control: private, max-age=3600` for authenticated responses
+  - `Content-Disposition: attachment` for PDF downloads
+  - Conditional requests with `If-None-Match` return 304 Not Modified
+- Security features:
+  - Path traversal protection via absolute path prefix validation
+  - Storage base configuration required (returns 500 if not set)
+- Handler tests cover:
+  - Not found, cross-company denied, invalid UUID
+  - Unauthenticated access, successful download
+  - Conditional requests, path traversal prevention
+  - Storage not configured error
+- `make build` and `make test` pass

@@ -61,6 +61,7 @@ func main() {
 	projectService := service.NewProjectService(pool)
 	ticketService := service.NewTicketService(pool)
 	photoService := service.NewPhotoService(pool)
+	fileService := service.NewFileService(pool)
 	queries := db.New(pool)
 
 	// Initialize handlers
@@ -69,6 +70,7 @@ func main() {
 	projectHandler := handler.NewProjectHandler(projectService)
 	ticketHandler := handler.NewTicketHandler(ticketService)
 	photoHandler := handler.NewPhotoHandler(photoService, cfg.Storage.BasePath, cfg.Storage.MaxFileSize, cfg.Storage.AllowedTypes)
+	fileHandler := handler.NewFileHandler(fileService, cfg.Storage.BasePath)
 
 	// Suppress unused variable warning (userService will be used later)
 	_ = userService
@@ -151,6 +153,13 @@ func main() {
 					).Post("/", photoHandler.Upload)
 					r.With(middleware.RequirePermission(domain.PermissionTicketWrite)).Delete("/{photo_id}", photoHandler.Delete)
 				})
+			})
+
+			// File downloads (secure, auth-required)
+			r.Route("/files", func(r chi.Router) {
+				r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/photos/{photo_id}", fileHandler.DownloadPhoto)
+				r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/signatures/{signature_id}", fileHandler.DownloadSignature)
+				r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/pdfs/{ticket_id}", fileHandler.DownloadPDF)
 			})
 		})
 	})
