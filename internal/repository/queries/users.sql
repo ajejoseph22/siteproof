@@ -44,3 +44,14 @@ SELECT * FROM users
 WHERE company_id = $1 AND role = $2 AND active = true AND deleted_at IS NULL
 ORDER BY name;
 
+-- name: ListUsersByCursor :many
+-- Cursor-based pagination for users by company.
+-- Uses name + id for stable ordering.
+SELECT * FROM users
+WHERE company_id = $1
+  AND deleted_at IS NULL
+  AND (sqlc.narg('cursor_name')::text IS NULL
+       OR (name, id) > (sqlc.narg('cursor_name')::text, sqlc.narg('cursor_id')::uuid))
+ORDER BY name ASC, id ASC
+LIMIT $2;
+

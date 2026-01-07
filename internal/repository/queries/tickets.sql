@@ -106,3 +106,33 @@ SELECT COUNT(*) FROM tickets WHERE project_id = $1;
 -- name: CountTicketsByCompany :one
 SELECT COUNT(*) FROM tickets WHERE company_id = $1;
 
+-- name: ListTicketsByCursor :many
+-- Cursor-based pagination for tickets by company.
+-- cursor_time and cursor_id are the created_at and id of the last item from previous page.
+-- For first page, pass NULL for both cursor params (or a far-future timestamp and empty UUID).
+SELECT * FROM tickets
+WHERE company_id = $1
+  AND (sqlc.narg('cursor_time')::timestamptz IS NULL
+       OR (created_at, id) < (sqlc.narg('cursor_time')::timestamptz, sqlc.narg('cursor_id')::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT $2;
+
+-- name: ListTicketsByStatusCursor :many
+-- Cursor-based pagination for tickets by company and status.
+SELECT * FROM tickets
+WHERE company_id = $1
+  AND status = $2
+  AND (sqlc.narg('cursor_time')::timestamptz IS NULL
+       OR (created_at, id) < (sqlc.narg('cursor_time')::timestamptz, sqlc.narg('cursor_id')::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT $3;
+
+-- name: ListTicketsByProjectCursor :many
+-- Cursor-based pagination for tickets by project.
+SELECT * FROM tickets
+WHERE project_id = $1
+  AND (sqlc.narg('cursor_time')::timestamptz IS NULL
+       OR (created_at, id) < (sqlc.narg('cursor_time')::timestamptz, sqlc.narg('cursor_id')::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT $2;
+
