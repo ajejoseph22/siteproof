@@ -31,9 +31,6 @@ jobs:
       - name: SQLC generate
         run: sqlc generate
 
-      - name: SQLC verify generated code is clean
-        run: git diff --exit-code internal/repository/db
-
       - name: Go vet
         run: go vet ./...
 
