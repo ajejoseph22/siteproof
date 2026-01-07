@@ -24,11 +24,13 @@ const (
 	AuditActionPhotoDeleted       AuditAction = "photo_deleted"
 	AuditActionDescriptionCleaned AuditAction = "description_cleaned"
 	AuditActionEmailSent          AuditAction = "email_sent"
-	AuditActionLineItemAdded      AuditAction = "line_item_added"
-	AuditActionLineItemUpdated    AuditAction = "line_item_updated"
-	AuditActionLineItemDeleted    AuditAction = "line_item_deleted"
-	AuditActionLogin              AuditAction = "login"
-	AuditActionLogout             AuditAction = "logout"
+	AuditActionLineItemAdded         AuditAction = "line_item_added"
+	AuditActionLineItemUpdated       AuditAction = "line_item_updated"
+	AuditActionLineItemDeleted       AuditAction = "line_item_deleted"
+	AuditActionLogin                 AuditAction = "login"
+	AuditActionLogout                AuditAction = "logout"
+	AuditActionSignatureRequested    AuditAction = "signature_requested"
+	AuditActionSigningLinkRevoked    AuditAction = "signing_link_revoked"
 )
 
 // AuditLog represents an immutable audit log entry.

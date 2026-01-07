@@ -63,6 +63,7 @@ func main() {
 	photoService := service.NewPhotoService(pool)
 	fileService := service.NewFileService(pool)
 	queries := db.New(pool)
+	signingLinkService := service.NewSigningLinkService(pool, queries, cfg.Server.BaseURL)
 
 	// Initialize handlers
 	healthHandler := handler.NewHealthHandler(pool, cfg.Storage.BasePath, Version)
@@ -71,6 +72,7 @@ func main() {
 	ticketHandler := handler.NewTicketHandler(ticketService)
 	photoHandler := handler.NewPhotoHandler(photoService, cfg.Storage.BasePath, cfg.Storage.MaxFileSize, cfg.Storage.AllowedTypes)
 	fileHandler := handler.NewFileHandler(fileService, cfg.Storage.BasePath)
+	signingLinkHandler := handler.NewSigningLinkHandler(signingLinkService)
 
 	// Suppress unused variable warning (userService will be used later)
 	_ = userService
@@ -107,6 +109,9 @@ func main() {
 			r.Post("/login", authHandler.Login)
 			r.Post("/refresh", authHandler.Refresh)
 		})
+
+		// Public signing link validation (for GC accessing signing page)
+		r.Get("/sign/{token}", signingLinkHandler.ValidateToken)
 
 		// Protected routes
 		r.Group(func(r chi.Router) {
@@ -152,6 +157,15 @@ func main() {
 						middleware.Idempotency(queries),
 					).Post("/", photoHandler.Upload)
 					r.With(middleware.RequirePermission(domain.PermissionTicketWrite)).Delete("/{photo_id}", photoHandler.Delete)
+				})
+				// Signature request endpoints
+				r.Route("/{id}/signature-request", func(r chi.Router) {
+					r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/", signingLinkHandler.GetActiveSigningLink)
+					r.With(
+						middleware.RequirePermission(domain.PermissionSignatureRequest),
+						middleware.Idempotency(queries),
+					).Post("/", signingLinkHandler.RequestSignature)
+					r.With(middleware.RequirePermission(domain.PermissionSignatureRequest)).Delete("/", signingLinkHandler.RevokeSigningLinks)
 				})
 			})
 

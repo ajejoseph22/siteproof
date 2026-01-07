@@ -284,7 +284,18 @@
       "Send signing link via email and SMS",
       "Record audit log entry for signature request"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Migration 000008 already creates signing_links table with token, expiration, verification_code, and delivery tracking.",
+      "Added SigningLinkService with RequestSignature, GetByToken, GetActiveByTicket, RevokeByTicket, and ValidateToken methods.",
+      "Added SigningLinkHandler with endpoints: POST /tickets/{id}/signature-request, GET /tickets/{id}/signature-request, DELETE /tickets/{id}/signature-request.",
+      "Added public GET /api/v1/sign/{token} endpoint for GC to validate signing links.",
+      "Signature requests are gated to tickets in pending_review status only.",
+      "Audit log entries created for signature_requested and signing_link_revoked actions.",
+      "Added PermissionSignatureRequest with RBAC for foreman, PM, and admin roles.",
+      "Email/SMS sending is logged but actual sending deferred to integration PRD items (Postmark, Twilio).",
+      "Added SERVER_BASE_URL config for signing URL generation."
+    ]
   },
   {
     "category": "backend",

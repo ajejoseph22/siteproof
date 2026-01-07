@@ -134,3 +134,32 @@
   - `TestFileHandlerDownloadPDFSuccess` - verifies PDF caching, headers, and Content-Disposition
   - Updated `TestFileHandlerDownloadPhotoSuccess` to verify immutable cache header
 - `make build` and `make test` pass
+
+## Signature Request Flow
+- Implemented signature request flow for GC signatures:
+  - Migration 000008 already created `signing_links` table with token, expiration, verification code, and delivery tracking
+  - Created `SigningLinkService` in `internal/service/signing_link.go`:
+    - `RequestSignature`: Creates secure signing link with 64-char token and 6-digit verification code
+    - `GetByToken`: Retrieves signing link by token
+    - `GetActiveByTicket`: Gets active signing link for a ticket (company-scoped)
+    - `RevokeByTicket`: Revokes all active signing links for a ticket
+    - `ValidateToken`: Validates token and checks expiry/used/revoked status
+  - Created `SigningLinkHandler` in `internal/handler/signing_link.go`:
+    - `POST /api/v1/tickets/{id}/signature-request` - Create signature request (idempotent)
+    - `GET /api/v1/tickets/{id}/signature-request` - Get active signing link
+    - `DELETE /api/v1/tickets/{id}/signature-request` - Revoke signing links
+    - `GET /api/v1/sign/{token}` - Public endpoint for GC to validate signing link
+- RBAC and permissions:
+  - Added `PermissionSignatureRequest` permission
+  - Granted to foreman, PM, and admin roles
+  - Signature requests require ticket to be in `pending_review` status
+- Audit logging:
+  - Added `AuditActionSignatureRequested` and `AuditActionSigningLinkRevoked` actions
+  - Audit log entries capture signing link ID, signer details, delivery methods, and expiration
+- Configuration:
+  - Added `SERVER_BASE_URL` config for signing URL generation (defaults to `http://localhost:8080`)
+- Email/SMS integration:
+  - Delivery methods tracked in `sent_via` array (email, sms)
+  - Actual sending deferred to Postmark/Twilio integration PRD items
+  - Events logged for future email/SMS service integration
+- `make build` and `make test` pass

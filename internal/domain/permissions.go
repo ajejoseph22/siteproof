@@ -4,20 +4,22 @@ package domain
 type Permission string
 
 const (
-	PermissionProjectRead  Permission = "project:read"
-	PermissionProjectWrite Permission = "project:write"
-	PermissionTicketRead   Permission = "ticket:read"
-	PermissionTicketWrite  Permission = "ticket:write"
-	PermissionTicketSubmit Permission = "ticket:submit"
-	PermissionTicketReject Permission = "ticket:reject"
+	PermissionProjectRead            Permission = "project:read"
+	PermissionProjectWrite           Permission = "project:write"
+	PermissionTicketRead             Permission = "ticket:read"
+	PermissionTicketWrite            Permission = "ticket:write"
+	PermissionTicketSubmit           Permission = "ticket:submit"
+	PermissionTicketReject           Permission = "ticket:reject"
+	PermissionSignatureRequest       Permission = "signature:request"
 )
 
 var rolePermissions = map[Role]map[Permission]struct{}{
 	RoleForeman: {
-		PermissionProjectRead:  {},
-		PermissionTicketRead:   {},
-		PermissionTicketWrite:  {},
-		PermissionTicketSubmit: {},
+		PermissionProjectRead:      {},
+		PermissionTicketRead:       {},
+		PermissionTicketWrite:      {},
+		PermissionTicketSubmit:     {},
+		PermissionSignatureRequest: {},
 	},
 	RoleGCSuper: {
 		PermissionProjectRead:  {},
@@ -25,23 +27,25 @@ var rolePermissions = map[Role]map[Permission]struct{}{
 		PermissionTicketReject: {},
 	},
 	RolePM: {
-		PermissionProjectRead:  {},
-		PermissionProjectWrite: {},
-		PermissionTicketRead:   {},
-		PermissionTicketWrite:  {},
-		PermissionTicketReject: {},
+		PermissionProjectRead:      {},
+		PermissionProjectWrite:     {},
+		PermissionTicketRead:       {},
+		PermissionTicketWrite:      {},
+		PermissionTicketReject:     {},
+		PermissionSignatureRequest: {},
 	},
 	RoleAccounting: {
 		PermissionProjectRead: {},
 		PermissionTicketRead:  {},
 	},
 	RoleAdmin: {
-		PermissionProjectRead:  {},
-		PermissionProjectWrite: {},
-		PermissionTicketRead:   {},
-		PermissionTicketWrite:  {},
-		PermissionTicketSubmit: {},
-		PermissionTicketReject: {},
+		PermissionProjectRead:      {},
+		PermissionProjectWrite:     {},
+		PermissionTicketRead:       {},
+		PermissionTicketWrite:      {},
+		PermissionTicketSubmit:     {},
+		PermissionTicketReject:     {},
+		PermissionSignatureRequest: {},
 	},
 }
 
