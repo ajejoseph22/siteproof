@@ -372,7 +372,11 @@
       "Use short timeouts for dependency checks",
       "Add basic tests for health endpoint"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Health and readiness checks now validate database + storage, include version/uptime, and use short dependency timeouts.",
+      "Added handler tests covering healthy, degraded, and ready responses."
+    ]
   },
   {
     "category": "ops",

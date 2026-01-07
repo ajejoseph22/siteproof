@@ -8,3 +8,6 @@ Completed RBAC + company scoping: added permission map + RequirePermission middl
 
 Completed ticket CRUD PRD item: added cursor-based ticket listing (company + project), wired status filter, and audit log entries for ticket lifecycle changes with actor tracking.
 Standardized API error handling: added APIError mapping + WriteErrorFrom, updated handlers to use it, and documented error codes in openapi.yaml. make test failed due to Go build cache permission limits.
+Completed line item management: added list/create/update/delete endpoints, draft-only enforcement with audit log entries, and ticket line_items_total aggregation migration. make test failed due to Go build cache permission.
+
+Completed health check endpoint: added storage readiness checks with timeouts, expanded /health payload, and added handler tests. make test failed due to Go build cache permission in /Users/joseph/Library/Caches/go-build.

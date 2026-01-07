@@ -63,7 +63,7 @@ func main() {
 	queries := db.New(pool)
 
 	// Initialize handlers
-	healthHandler := handler.NewHealthHandler(pool, Version)
+	healthHandler := handler.NewHealthHandler(pool, cfg.Storage.BasePath, Version)
 	authHandler := handler.NewAuthHandler(authService)
 	projectHandler := handler.NewProjectHandler(projectService)
 	ticketHandler := handler.NewTicketHandler(ticketService)
