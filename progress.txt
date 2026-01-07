@@ -118,3 +118,19 @@
   - Conditional requests, path traversal prevention
   - Storage not configured error
 - `make build` and `make test` pass
+
+## Immutable Photo Caching
+- Implemented long-lived immutable caching for photo downloads:
+  - Photos served via `/api/v1/files/photos/{photo_id}` are inherently immutable (unique ID per upload)
+  - Updated `serveFile()` in `internal/handler/file.go` to accept `isImmutablePhoto` flag
+  - Photo responses now use `Cache-Control: private, max-age=31536000, immutable` (1-year cache)
+  - Signatures and PDFs retain shorter `max-age=3600` cache since they may be regenerated
+- Auth checks remain enforced:
+  - `private` directive prevents shared caching
+  - Auth middleware runs on every request before file serving
+  - ETag from SHA-256 hash enables conditional requests (304 Not Modified)
+- Added new handler tests:
+  - `TestFileHandlerDownloadSignatureSuccess` - verifies signature caching and headers
+  - `TestFileHandlerDownloadPDFSuccess` - verifies PDF caching, headers, and Content-Disposition
+  - Updated `TestFileHandlerDownloadPhotoSuccess` to verify immutable cache header
+- `make build` and `make test` pass

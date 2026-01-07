@@ -257,6 +257,26 @@
   },
   {
     "category": "backend",
+    "description": "Serve immutable photo URLs with long-lived private caching",
+    "steps": [
+      "Ensure photo file URLs are immutable (include photo id or sha256 hash in the path/query)",
+      "Set Cache-Control: private, max-age=31536000, immutable on photo responses",
+      "Keep auth checks on the photo endpoint even when cached",
+      "Add or update tests to verify cache headers on photo responses"
+    ],
+    "passes": true,
+    "notes": [
+      "Photo URLs are immutable via /api/v1/files/photos/{photo_id} endpoint with ETag from SHA-256 hash.",
+      "Updated serveFile() to accept isImmutablePhoto flag for differentiated caching.",
+      "Photos now use Cache-Control: private, max-age=31536000, immutable (1-year cache).",
+      "Signatures and PDFs retain Cache-Control: private, max-age=3600 since they may be regenerated.",
+      "Auth middleware runs on every request regardless of caching (private directive ensures no shared cache).",
+      "Added TestFileHandlerDownloadSignatureSuccess and TestFileHandlerDownloadPDFSuccess to verify cache headers.",
+      "Updated TestFileHandlerDownloadPhotoSuccess to verify immutable cache header."
+    ]
+  },
+  {
+    "category": "backend",
     "description": "Implement signature request flow",
     "steps": [
       "Create signing_links table with token and expiration",

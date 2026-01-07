@@ -62,7 +62,7 @@ func (h *FileHandler) DownloadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.serveFile(w, r, photo.FilePath, photo.MimeType, photo.FileHash)
+	h.serveFile(w, r, photo.FilePath, photo.MimeType, photo.FileHash, true)
 }
 
 // DownloadSignature handles GET /api/v1/files/signatures/{signature_id}
@@ -88,8 +88,9 @@ func (h *FileHandler) DownloadSignature(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Signature images are always PNG
-	h.serveFile(w, r, signature.SignatureImage, "image/png", signature.SignatureHash)
+	// Signature images are always PNG. Not marked as immutable since signatures
+	// are tied to ticket workflow and could theoretically be regenerated.
+	h.serveFile(w, r, signature.SignatureImage, "image/png", signature.SignatureHash, false)
 }
 
 // DownloadPDF handles GET /api/v1/files/pdfs/{ticket_id}
@@ -125,11 +126,12 @@ func (h *FileHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 		pdfHash = *ticket.PDFHash
 	}
 
-	h.serveFile(w, r, *ticket.PDFPath, "application/pdf", pdfHash)
+	h.serveFile(w, r, *ticket.PDFPath, "application/pdf", pdfHash, false)
 }
 
 // serveFile serves a file from the storage directory with proper headers.
-func (h *FileHandler) serveFile(w http.ResponseWriter, r *http.Request, relativePath, contentType, hash string) {
+// If isImmutablePhoto is true, applies long-lived caching for immutable photo files.
+func (h *FileHandler) serveFile(w http.ResponseWriter, r *http.Request, relativePath, contentType, hash string, isImmutablePhoto bool) {
 	if strings.TrimSpace(h.storageBase) == "" {
 		WriteError(w, http.StatusInternalServerError, "STORAGE_NOT_CONFIGURED", "storage base path not configured")
 		return
@@ -201,8 +203,14 @@ func (h *FileHandler) serveFile(w http.ResponseWriter, r *http.Request, relative
 		w.Header().Set("ETag", `"`+hash+`"`)
 	}
 
-	// Cache control: private (requires auth), max-age 1 hour
-	w.Header().Set("Cache-Control", "private, max-age=3600")
+	// Cache control: private (requires auth).
+	// Photos are immutable (keyed by ID with content hash) and can be cached for 1 year.
+	// Other files (PDFs, signatures) use shorter cache duration as they may be regenerated.
+	if isImmutablePhoto {
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "private, max-age=3600")
+	}
 
 	// Content-Disposition for PDFs (triggers download)
 	if contentType == "application/pdf" {

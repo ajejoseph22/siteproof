@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -193,8 +194,10 @@ func TestFileHandlerDownloadPhotoSuccess(t *testing.T) {
 		t.Fatalf("expected ETag \"abc123\", got %s", recorder.Header().Get("ETag"))
 	}
 
-	if recorder.Header().Get("Cache-Control") != "private, max-age=3600" {
-		t.Fatalf("expected Cache-Control private, max-age=3600, got %s", recorder.Header().Get("Cache-Control"))
+	// Photos use long-lived immutable caching (1 year)
+	expectedCacheControl := "private, max-age=31536000, immutable"
+	if recorder.Header().Get("Cache-Control") != expectedCacheControl {
+		t.Fatalf("expected Cache-Control %q, got %s", expectedCacheControl, recorder.Header().Get("Cache-Control"))
 	}
 }
 
@@ -369,6 +372,142 @@ func TestFileHandlerPathTraversalPrevented(t *testing.T) {
 	// Should return 404 due to path traversal protection
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d for path traversal attempt, got %d", http.StatusNotFound, recorder.Code)
+	}
+}
+
+func TestFileHandlerDownloadSignatureSuccess(t *testing.T) {
+	// Create a temporary directory and file for this test
+	tmpDir, err := os.MkdirTemp("", "file_handler_test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a test signature file
+	testSignaturePath := filepath.Join(tmpDir, "test", "signature.png")
+	if err := os.MkdirAll(filepath.Dir(testSignaturePath), 0755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+	testContent := []byte("fake png content")
+	if err := os.WriteFile(testSignaturePath, testContent, 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	companyID := uuid.New()
+	signatureID := uuid.New()
+	ticketID := uuid.New()
+
+	handler := NewFileHandler(fileServiceStub{
+		getSignatureByID: func(ctx context.Context, companyIDArg, signatureIDArg uuid.UUID) (*domain.Signature, error) {
+			return &domain.Signature{
+				ID:             signatureIDArg,
+				TicketID:       ticketID,
+				SignatureImage: "test/signature.png",
+				SignatureHash:  "sig123",
+				SignerType:     domain.SignerTypeForeman,
+				SignedAt:       time.Now(),
+			}, nil
+		},
+	}, tmpDir)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/files/signatures/"+signatureID.String(), nil)
+	routeCtx := chi.NewRouteContext()
+	routeCtx.URLParams.Add("signature_id", signatureID.String())
+	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, routeCtx)
+	ctx = middleware.WithUserContext(ctx, uuid.New(), companyID, domain.RoleAdmin)
+	req = req.WithContext(ctx)
+
+	recorder := httptest.NewRecorder()
+	handler.DownloadSignature(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
+	}
+
+	if recorder.Header().Get("Content-Type") != "image/png" {
+		t.Fatalf("expected Content-Type image/png, got %s", recorder.Header().Get("Content-Type"))
+	}
+
+	if recorder.Header().Get("ETag") != `"sig123"` {
+		t.Fatalf("expected ETag \"sig123\", got %s", recorder.Header().Get("ETag"))
+	}
+
+	// Signatures use standard caching (not immutable) since they're tied to ticket workflow
+	expectedCacheControl := "private, max-age=3600"
+	if recorder.Header().Get("Cache-Control") != expectedCacheControl {
+		t.Fatalf("expected Cache-Control %q, got %s", expectedCacheControl, recorder.Header().Get("Cache-Control"))
+	}
+}
+
+func TestFileHandlerDownloadPDFSuccess(t *testing.T) {
+	// Create a temporary directory and file for this test
+	tmpDir, err := os.MkdirTemp("", "file_handler_test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a test PDF file
+	testPDFPath := filepath.Join(tmpDir, "test", "ticket.pdf")
+	if err := os.MkdirAll(filepath.Dir(testPDFPath), 0755); err != nil {
+		t.Fatalf("failed to create test dir: %v", err)
+	}
+	testContent := []byte("%PDF-1.4 fake pdf content")
+	if err := os.WriteFile(testPDFPath, testContent, 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	companyID := uuid.New()
+	ticketID := uuid.New()
+	pdfPath := "test/ticket.pdf"
+	pdfHash := "pdf456"
+
+	handler := NewFileHandler(fileServiceStub{
+		getTicketByID: func(ctx context.Context, companyIDArg, ticketIDArg uuid.UUID) (*domain.Ticket, error) {
+			return &domain.Ticket{
+				ID:        ticketIDArg,
+				CompanyID: companyIDArg,
+				PDFPath:   &pdfPath,
+				PDFHash:   &pdfHash,
+			}, nil
+		},
+	}, tmpDir)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/files/pdfs/"+ticketID.String(), nil)
+	routeCtx := chi.NewRouteContext()
+	routeCtx.URLParams.Add("ticket_id", ticketID.String())
+	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, routeCtx)
+	ctx = middleware.WithUserContext(ctx, uuid.New(), companyID, domain.RoleAdmin)
+	req = req.WithContext(ctx)
+
+	recorder := httptest.NewRecorder()
+	handler.DownloadPDF(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
+	}
+
+	if recorder.Header().Get("Content-Type") != "application/pdf" {
+		t.Fatalf("expected Content-Type application/pdf, got %s", recorder.Header().Get("Content-Type"))
+	}
+
+	if recorder.Header().Get("ETag") != `"pdf456"` {
+		t.Fatalf("expected ETag \"pdf456\", got %s", recorder.Header().Get("ETag"))
+	}
+
+	// PDFs use standard caching (not immutable) since they can be regenerated
+	expectedCacheControl := "private, max-age=3600"
+	if recorder.Header().Get("Cache-Control") != expectedCacheControl {
+		t.Fatalf("expected Cache-Control %q, got %s", expectedCacheControl, recorder.Header().Get("Cache-Control"))
+	}
+
+	// PDFs should have Content-Disposition attachment header
+	contentDisposition := recorder.Header().Get("Content-Disposition")
+	if contentDisposition == "" {
+		t.Fatal("expected Content-Disposition header for PDF")
+	}
+	if !strings.Contains(contentDisposition, "attachment") {
+		t.Fatalf("expected Content-Disposition to contain 'attachment', got %s", contentDisposition)
 	}
 }
 
