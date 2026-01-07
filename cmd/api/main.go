@@ -132,6 +132,15 @@ func main() {
 				r.With(middleware.RequirePermission(domain.PermissionTicketWrite)).Patch("/{id}", ticketHandler.Update)
 				r.With(middleware.RequirePermission(domain.PermissionTicketSubmit)).Post("/{id}/submit", ticketHandler.Submit)
 				r.With(middleware.RequirePermission(domain.PermissionTicketReject)).Post("/{id}/reject", ticketHandler.Reject)
+				r.Route("/{id}/line-items", func(r chi.Router) {
+					r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/", ticketHandler.ListLineItems)
+					r.With(
+						middleware.RequirePermission(domain.PermissionTicketWrite),
+						middleware.Idempotency(queries),
+					).Post("/", ticketHandler.CreateLineItem)
+					r.With(middleware.RequirePermission(domain.PermissionTicketWrite)).Patch("/{line_item_id}", ticketHandler.UpdateLineItem)
+					r.With(middleware.RequirePermission(domain.PermissionTicketWrite)).Delete("/{line_item_id}", ticketHandler.DeleteLineItem)
+				})
 			})
 		})
 	})

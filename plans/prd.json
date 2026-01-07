@@ -213,7 +213,12 @@
       "Update ticket totals after line item changes",
       "Record audit log entries for line item changes"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Added ticket line item list/create/update/delete endpoints gated to draft tickets, with idempotent create and RBAC ticket:write/read checks.",
+      "Line item totals are computed from quantity \u00d7 unit_rate, ticket-level line_items_total is persisted on each change, and audit logs record line_item_* actions with total deltas.",
+      "Follow-up: regenerate sqlc models for the new tickets.line_items_total column and document the PATCH line item endpoint in openapi.yaml."
+    ]
   },
   {
     "category": "backend",

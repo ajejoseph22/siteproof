@@ -23,6 +23,9 @@ const (
 	AuditActionPhotoAdded         AuditAction = "photo_added"
 	AuditActionDescriptionCleaned AuditAction = "description_cleaned"
 	AuditActionEmailSent          AuditAction = "email_sent"
+	AuditActionLineItemAdded      AuditAction = "line_item_added"
+	AuditActionLineItemUpdated    AuditAction = "line_item_updated"
+	AuditActionLineItemDeleted    AuditAction = "line_item_deleted"
 	AuditActionLogin              AuditAction = "login"
 	AuditActionLogout             AuditAction = "logout"
 )

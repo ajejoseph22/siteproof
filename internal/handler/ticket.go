@@ -21,7 +21,11 @@ type TicketService interface {
 	GetByID(ctx context.Context, companyID, id uuid.UUID) (*domain.Ticket, error)
 	ListByCompany(ctx context.Context, companyID uuid.UUID, status *domain.TicketStatus, limit int, cursor *domain.TicketCursor) ([]*domain.Ticket, error)
 	ListByProject(ctx context.Context, companyID, projectID uuid.UUID, limit int, cursor *domain.TicketCursor) ([]*domain.Ticket, error)
+	ListLineItems(ctx context.Context, companyID, ticketID uuid.UUID) ([]*domain.TicketLineItem, error)
 	Update(ctx context.Context, companyID, id, actorID uuid.UUID, input *domain.UpdateTicketInput) (*domain.Ticket, error)
+	CreateLineItem(ctx context.Context, companyID, ticketID, actorID uuid.UUID, input *domain.CreateLineItemInput) (*domain.TicketLineItem, error)
+	UpdateLineItem(ctx context.Context, companyID, ticketID, lineItemID, actorID uuid.UUID, input *domain.UpdateLineItemInput) (*domain.TicketLineItem, error)
+	DeleteLineItem(ctx context.Context, companyID, ticketID, lineItemID, actorID uuid.UUID) error
 	SubmitForReview(ctx context.Context, companyID, id, actorID uuid.UUID) (*domain.Ticket, error)
 	Reject(ctx context.Context, companyID, id, rejectorID uuid.UUID, reason string) (*domain.Ticket, error)
 }

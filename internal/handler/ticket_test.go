@@ -45,8 +45,24 @@ func (s ticketServiceStub) ListByProject(ctx context.Context, companyID, project
 	return s.listByProject(ctx, companyID, projectID, limit, cursor)
 }
 
+func (s ticketServiceStub) ListLineItems(ctx context.Context, companyID, ticketID uuid.UUID) ([]*domain.TicketLineItem, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s ticketServiceStub) Update(ctx context.Context, companyID, id, actorID uuid.UUID, input *domain.UpdateTicketInput) (*domain.Ticket, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (s ticketServiceStub) CreateLineItem(ctx context.Context, companyID, ticketID, actorID uuid.UUID, input *domain.CreateLineItemInput) (*domain.TicketLineItem, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s ticketServiceStub) UpdateLineItem(ctx context.Context, companyID, ticketID, lineItemID, actorID uuid.UUID, input *domain.UpdateLineItemInput) (*domain.TicketLineItem, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s ticketServiceStub) DeleteLineItem(ctx context.Context, companyID, ticketID, lineItemID, actorID uuid.UUID) error {
+	return errors.New("not implemented")
 }
 
 func (s ticketServiceStub) SubmitForReview(ctx context.Context, companyID, id, actorID uuid.UUID) (*domain.Ticket, error) {

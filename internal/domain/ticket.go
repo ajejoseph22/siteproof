@@ -187,6 +187,9 @@ type CreateLineItemInput struct {
 func (i *CreateLineItemInput) Validate() error {
 	var errs ValidationErrors
 
+	if i.TicketID == uuid.Nil {
+		errs.Add("ticket_id", "is required")
+	}
 	if !i.ItemType.IsValid() {
 		errs.Add("item_type", "must be labor, material, or equipment")
 	}
@@ -198,6 +201,54 @@ func (i *CreateLineItemInput) Validate() error {
 	}
 	if i.Unit == "" {
 		errs.Add("unit", "is required")
+	}
+	if i.UnitRate != nil && *i.UnitRate < 0 {
+		errs.Add("unit_rate", "must be non-negative")
+	}
+	if i.SortOrder < 0 {
+		errs.Add("sort_order", "must be non-negative")
+	}
+
+	if errs.HasErrors() {
+		return errs
+	}
+	return nil
+}
+
+// UpdateLineItemInput represents input for updating a line item.
+type UpdateLineItemInput struct {
+	ItemType    *LineItemType
+	Description *string
+	Quantity    *float64
+	Unit        *string
+	UnitRate    *float64
+	SortOrder   *int
+}
+
+// Validate validates the update line item input.
+func (i *UpdateLineItemInput) Validate() error {
+	var errs ValidationErrors
+
+	if i.ItemType == nil && i.Description == nil && i.Quantity == nil && i.Unit == nil && i.UnitRate == nil && i.SortOrder == nil {
+		errs.Add("line_item", "at least one field must be provided")
+	}
+	if i.ItemType != nil && !i.ItemType.IsValid() {
+		errs.Add("item_type", "must be labor, material, or equipment")
+	}
+	if i.Description != nil && *i.Description == "" {
+		errs.Add("description", "is required")
+	}
+	if i.Quantity != nil && *i.Quantity <= 0 {
+		errs.Add("quantity", "must be positive")
+	}
+	if i.Unit != nil && *i.Unit == "" {
+		errs.Add("unit", "is required")
+	}
+	if i.UnitRate != nil && *i.UnitRate < 0 {
+		errs.Add("unit_rate", "must be non-negative")
+	}
+	if i.SortOrder != nil && *i.SortOrder < 0 {
+		errs.Add("sort_order", "must be non-negative")
 	}
 
 	if errs.HasErrors() {
