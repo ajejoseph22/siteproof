@@ -14,6 +14,8 @@ type AuditAction string
 const (
 	AuditActionCreated            AuditAction = "created"
 	AuditActionUpdated            AuditAction = "updated"
+	AuditActionSubmitted          AuditAction = "submitted"
+	AuditActionApproved           AuditAction = "approved"
 	AuditActionDeleted            AuditAction = "deleted"
 	AuditActionSigned             AuditAction = "signed"
 	AuditActionLocked             AuditAction = "locked"

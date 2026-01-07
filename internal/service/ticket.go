@@ -28,8 +28,14 @@ func (s *TicketService) Create(ctx context.Context, input *domain.CreateTicketIn
 		return nil, err
 	}
 
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin ticket create: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	var projectExists bool
-	err := s.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		SELECT EXISTS(SELECT 1 FROM projects WHERE id = $1 AND company_id = $2)
 	`, input.ProjectID, input.CompanyID).Scan(&projectExists)
 	if err != nil {
@@ -41,7 +47,7 @@ func (s *TicketService) Create(ctx context.Context, input *domain.CreateTicketIn
 
 	// Get next ticket number
 	var nextNumber int
-	err = s.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_number FROM '[0-9]+$') AS INTEGER)), 0) + 1
 		FROM tickets WHERE company_id = $1
 	`, input.CompanyID).Scan(&nextNumber)
@@ -58,7 +64,7 @@ func (s *TicketService) Create(ctx context.Context, input *domain.CreateTicketIn
 
 	// Create ticket
 	var ticket domain.Ticket
-	err = s.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		INSERT INTO tickets (
 			company_id, project_id, created_by_id, ticket_number, ticket_type,
 			title, work_date, status
@@ -76,6 +82,27 @@ func (s *TicketService) Create(ctx context.Context, input *domain.CreateTicketIn
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create ticket: %w", err)
+	}
+
+	changes := map[string]domain.ChangeValue{
+		"status":        {Old: nil, New: ticket.Status},
+		"title":         {Old: nil, New: ticket.Title},
+		"ticket_type":   {Old: nil, New: ticket.TicketType},
+		"ticket_number": {Old: nil, New: ticket.TicketNumber},
+		"work_date":     {Old: nil, New: ticket.WorkDate},
+	}
+	if err := s.insertAuditLog(ctx, tx, domain.CreateAuditLogInput{
+		EntityType: "ticket",
+		EntityID:   ticket.ID,
+		Action:     domain.AuditActionCreated,
+		ActorID:    &input.CreatedByID,
+		Changes:    changes,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit ticket create: %w", err)
 	}
 
 	return &ticket, nil
@@ -111,16 +138,70 @@ func (s *TicketService) GetByID(ctx context.Context, companyID, id uuid.UUID) (*
 	return &ticket, nil
 }
 
+// ListByCompany retrieves tickets for a company with optional status filtering.
+func (s *TicketService) ListByCompany(ctx context.Context, companyID uuid.UUID, status *domain.TicketStatus, limit int, cursor *domain.TicketCursor) ([]*domain.Ticket, error) {
+	var statusFilter *string
+	if status != nil {
+		statusValue := string(*status)
+		statusFilter = &statusValue
+	}
+
+	var cursorTime *time.Time
+	var cursorID *uuid.UUID
+	if cursor != nil {
+		cursorTime = &cursor.Time
+		cursorID = &cursor.ID
+	}
+
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, company_id, project_id, created_by_id, ticket_number, ticket_type,
+		       title, work_date, status, created_at, updated_at
+		FROM tickets
+		WHERE company_id = $1
+		  AND ($2::text IS NULL OR status = $2)
+		  AND ($3::timestamptz IS NULL OR (created_at, id) < ($3::timestamptz, $4::uuid))
+		ORDER BY created_at DESC, id DESC
+		LIMIT $5
+	`, companyID, statusFilter, cursorTime, cursorID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list tickets: %w", err)
+	}
+	defer rows.Close()
+
+	var tickets []*domain.Ticket
+	for rows.Next() {
+		var t domain.Ticket
+		if err := rows.Scan(
+			&t.ID, &t.CompanyID, &t.ProjectID, &t.CreatedByID,
+			&t.TicketNumber, &t.TicketType, &t.Title, &t.WorkDate,
+			&t.Status, &t.CreatedAt, &t.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan ticket: %w", err)
+		}
+		tickets = append(tickets, &t)
+	}
+
+	return tickets, nil
+}
+
 // ListByProject retrieves tickets for a project.
-func (s *TicketService) ListByProject(ctx context.Context, companyID, projectID uuid.UUID, limit, offset int) ([]*domain.Ticket, error) {
+func (s *TicketService) ListByProject(ctx context.Context, companyID, projectID uuid.UUID, limit int, cursor *domain.TicketCursor) ([]*domain.Ticket, error) {
+	var cursorTime *time.Time
+	var cursorID *uuid.UUID
+	if cursor != nil {
+		cursorTime = &cursor.Time
+		cursorID = &cursor.ID
+	}
+
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, company_id, project_id, created_by_id, ticket_number, ticket_type,
 		       title, work_date, status, created_at, updated_at
 		FROM tickets
 		WHERE project_id = $1 AND company_id = $2
-		ORDER BY created_at DESC
-		LIMIT $3 OFFSET $4
-	`, projectID, companyID, limit, offset)
+		  AND ($3::timestamptz IS NULL OR (created_at, id) < ($3::timestamptz, $4::uuid))
+		ORDER BY created_at DESC, id DESC
+		LIMIT $5
+	`, projectID, companyID, cursorTime, cursorID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list tickets: %w", err)
 	}
@@ -143,7 +224,7 @@ func (s *TicketService) ListByProject(ctx context.Context, companyID, projectID 
 }
 
 // Update updates a ticket (only drafts can be updated).
-func (s *TicketService) Update(ctx context.Context, companyID, id uuid.UUID, input *domain.UpdateTicketInput) (*domain.Ticket, error) {
+func (s *TicketService) Update(ctx context.Context, companyID, id, actorID uuid.UUID, input *domain.UpdateTicketInput) (*domain.Ticket, error) {
 	// First check if ticket is editable
 	ticket, err := s.GetByID(ctx, companyID, id)
 	if err != nil {
@@ -154,8 +235,14 @@ func (s *TicketService) Update(ctx context.Context, companyID, id uuid.UUID, inp
 		return nil, domain.ErrTicketLocked
 	}
 
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin ticket update: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	var updated domain.Ticket
-	err = s.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		UPDATE tickets
 		SET title = COALESCE($3, title),
 		    description_final = COALESCE($4, description_final),
@@ -175,11 +262,36 @@ func (s *TicketService) Update(ctx context.Context, companyID, id uuid.UUID, inp
 		return nil, fmt.Errorf("update ticket: %w", err)
 	}
 
+	changes := map[string]domain.ChangeValue{}
+	if input.Title != nil {
+		changes["title"] = domain.ChangeValue{Old: ticket.Title, New: updated.Title}
+	}
+	if input.DescriptionFinal != nil {
+		changes["description_final"] = domain.ChangeValue{Old: ticket.DescriptionFinal, New: updated.DescriptionFinal}
+	}
+	if input.WorkDate != nil {
+		changes["work_date"] = domain.ChangeValue{Old: ticket.WorkDate, New: updated.WorkDate}
+	}
+
+	if err := s.insertAuditLog(ctx, tx, domain.CreateAuditLogInput{
+		EntityType: "ticket",
+		EntityID:   updated.ID,
+		Action:     domain.AuditActionUpdated,
+		ActorID:    &actorID,
+		Changes:    changes,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit ticket update: %w", err)
+	}
+
 	return &updated, nil
 }
 
 // SubmitForReview changes ticket status to pending_review.
-func (s *TicketService) SubmitForReview(ctx context.Context, companyID, id uuid.UUID) (*domain.Ticket, error) {
+func (s *TicketService) SubmitForReview(ctx context.Context, companyID, id, actorID uuid.UUID) (*domain.Ticket, error) {
 	ticket, err := s.GetByID(ctx, companyID, id)
 	if err != nil {
 		return nil, err
@@ -189,8 +301,14 @@ func (s *TicketService) SubmitForReview(ctx context.Context, companyID, id uuid.
 		return nil, domain.ErrInvalidTransition
 	}
 
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin ticket submit: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	var updated domain.Ticket
-	err = s.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		UPDATE tickets
 		SET status = 'pending_review', updated_at = now()
 		WHERE id = $1 AND company_id = $2
@@ -203,6 +321,23 @@ func (s *TicketService) SubmitForReview(ctx context.Context, companyID, id uuid.
 	)
 	if err != nil {
 		return nil, fmt.Errorf("submit ticket: %w", err)
+	}
+
+	changes := map[string]domain.ChangeValue{
+		"status": {Old: ticket.Status, New: updated.Status},
+	}
+	if err := s.insertAuditLog(ctx, tx, domain.CreateAuditLogInput{
+		EntityType: "ticket",
+		EntityID:   updated.ID,
+		Action:     domain.AuditActionSubmitted,
+		ActorID:    &actorID,
+		Changes:    changes,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit ticket submit: %w", err)
 	}
 
 	return &updated, nil
@@ -219,8 +354,14 @@ func (s *TicketService) Approve(ctx context.Context, companyID, id, signerID uui
 		return nil, domain.ErrInvalidTransition
 	}
 
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin ticket approve: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	var updated domain.Ticket
-	err = s.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		UPDATE tickets
 		SET status = 'approved',
 		    gc_signed_at = now(),
@@ -238,6 +379,25 @@ func (s *TicketService) Approve(ctx context.Context, companyID, id, signerID uui
 	)
 	if err != nil {
 		return nil, fmt.Errorf("approve ticket: %w", err)
+	}
+
+	changes := map[string]domain.ChangeValue{
+		"status":          {Old: ticket.Status, New: updated.Status},
+		"gc_signed_at":    {Old: ticket.GCSignedAt, New: updated.GCSignedAt},
+		"gc_signed_by_id": {Old: ticket.GCSignedByID, New: updated.GCSignedByID},
+	}
+	if err := s.insertAuditLog(ctx, tx, domain.CreateAuditLogInput{
+		EntityType: "ticket",
+		EntityID:   updated.ID,
+		Action:     domain.AuditActionApproved,
+		ActorID:    &signerID,
+		Changes:    changes,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit ticket approve: %w", err)
 	}
 
 	return &updated, nil
@@ -258,8 +418,14 @@ func (s *TicketService) Reject(ctx context.Context, companyID, id, rejectorID uu
 		return nil, &domain.ValidationError{Field: "reason", Message: "rejection reason is required"}
 	}
 
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin ticket reject: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	var updated domain.Ticket
-	err = s.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		UPDATE tickets
 		SET status = 'rejected',
 		    rejected_at = now(),
@@ -280,6 +446,26 @@ func (s *TicketService) Reject(ctx context.Context, companyID, id, rejectorID uu
 		return nil, fmt.Errorf("reject ticket: %w", err)
 	}
 
+	changes := map[string]domain.ChangeValue{
+		"status":           {Old: ticket.Status, New: updated.Status},
+		"rejected_at":      {Old: ticket.RejectedAt, New: updated.RejectedAt},
+		"rejected_by_id":   {Old: ticket.RejectedByID, New: updated.RejectedByID},
+		"rejection_reason": {Old: ticket.RejectionReason, New: updated.RejectionReason},
+	}
+	if err := s.insertAuditLog(ctx, tx, domain.CreateAuditLogInput{
+		EntityType: "ticket",
+		EntityID:   updated.ID,
+		Action:     domain.AuditActionRejected,
+		ActorID:    &rejectorID,
+		Changes:    changes,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit ticket reject: %w", err)
+	}
+
 	return &updated, nil
 }
 
@@ -294,8 +480,14 @@ func (s *TicketService) Lock(ctx context.Context, companyID, id uuid.UUID, pdfPa
 		return nil, domain.ErrInvalidTransition
 	}
 
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin ticket lock: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	var updated domain.Ticket
-	err = s.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		UPDATE tickets
 		SET status = 'locked',
 		    locked_at = now(),
@@ -318,5 +510,43 @@ func (s *TicketService) Lock(ctx context.Context, companyID, id uuid.UUID, pdfPa
 		return nil, fmt.Errorf("lock ticket: %w", err)
 	}
 
+	changes := map[string]domain.ChangeValue{
+		"status":       {Old: ticket.Status, New: updated.Status},
+		"locked_at":    {Old: ticket.LockedAt, New: updated.LockedAt},
+		"pdf_path":     {Old: ticket.PDFPath, New: updated.PDFPath},
+		"pdf_hash":     {Old: ticket.PDFHash, New: updated.PDFHash},
+		"content_hash": {Old: ticket.ContentHash, New: updated.ContentHash},
+	}
+	if err := s.insertAuditLog(ctx, tx, domain.CreateAuditLogInput{
+		EntityType: "ticket",
+		EntityID:   updated.ID,
+		Action:     domain.AuditActionLocked,
+		ActorID:    nil,
+		Changes:    changes,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit ticket lock: %w", err)
+	}
+
 	return &updated, nil
+}
+
+func (s *TicketService) insertAuditLog(ctx context.Context, tx pgx.Tx, input domain.CreateAuditLogInput) error {
+	changesJSON, err := input.ToJSON()
+	if err != nil {
+		return fmt.Errorf("marshal audit changes: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO audit_logs (entity_type, entity_id, action, actor_id, actor_ip, changes)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, input.EntityType, input.EntityID, input.Action, input.ActorID, input.ActorIP, changesJSON)
+	if err != nil {
+		return fmt.Errorf("insert audit log: %w", err)
+	}
+
+	return nil
 }

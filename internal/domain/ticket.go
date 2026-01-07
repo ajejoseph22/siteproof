@@ -84,6 +84,12 @@ type Ticket struct {
 	UpdatedAt          time.Time    `json:"updated_at"`
 }
 
+// TicketCursor represents a cursor for ticket pagination.
+type TicketCursor struct {
+	Time time.Time
+	ID   uuid.UUID
+}
+
 // IsLocked returns true if the ticket is locked.
 func (t *Ticket) IsLocked() bool {
 	return t.Status == TicketStatusLocked

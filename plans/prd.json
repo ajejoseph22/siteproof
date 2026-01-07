@@ -193,7 +193,11 @@
       "Enforce status transition rules in domain logic",
       "Write audit log entries for each ticket state change"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Added GET /api/v1/tickets with cursor-based pagination and optional status filtering, and updated project ticket list to use cursors.",
+      "Ticket updates and status transitions now write audit log entries for create, update, submit, approve, reject, and lock actions with field-level changes."
+    ]
   },
   {
     "category": "backend",

@@ -15,7 +15,9 @@ import (
 )
 
 type ticketServiceStub struct {
-	getByID func(ctx context.Context, companyID, id uuid.UUID) (*domain.Ticket, error)
+	getByID       func(ctx context.Context, companyID, id uuid.UUID) (*domain.Ticket, error)
+	listByCompany func(ctx context.Context, companyID uuid.UUID, status *domain.TicketStatus, limit int, cursor *domain.TicketCursor) ([]*domain.Ticket, error)
+	listByProject func(ctx context.Context, companyID, projectID uuid.UUID, limit int, cursor *domain.TicketCursor) ([]*domain.Ticket, error)
 }
 
 func (s ticketServiceStub) Create(ctx context.Context, input *domain.CreateTicketInput) (*domain.Ticket, error) {
@@ -29,15 +31,25 @@ func (s ticketServiceStub) GetByID(ctx context.Context, companyID, id uuid.UUID)
 	return s.getByID(ctx, companyID, id)
 }
 
-func (s ticketServiceStub) ListByProject(ctx context.Context, companyID, projectID uuid.UUID, limit, offset int) ([]*domain.Ticket, error) {
+func (s ticketServiceStub) ListByCompany(ctx context.Context, companyID uuid.UUID, status *domain.TicketStatus, limit int, cursor *domain.TicketCursor) ([]*domain.Ticket, error) {
+	if s.listByCompany == nil {
+		return nil, errors.New("not implemented")
+	}
+	return s.listByCompany(ctx, companyID, status, limit, cursor)
+}
+
+func (s ticketServiceStub) ListByProject(ctx context.Context, companyID, projectID uuid.UUID, limit int, cursor *domain.TicketCursor) ([]*domain.Ticket, error) {
+	if s.listByProject == nil {
+		return nil, errors.New("not implemented")
+	}
+	return s.listByProject(ctx, companyID, projectID, limit, cursor)
+}
+
+func (s ticketServiceStub) Update(ctx context.Context, companyID, id, actorID uuid.UUID, input *domain.UpdateTicketInput) (*domain.Ticket, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s ticketServiceStub) Update(ctx context.Context, companyID, id uuid.UUID, input *domain.UpdateTicketInput) (*domain.Ticket, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s ticketServiceStub) SubmitForReview(ctx context.Context, companyID, id uuid.UUID) (*domain.Ticket, error) {
+func (s ticketServiceStub) SubmitForReview(ctx context.Context, companyID, id, actorID uuid.UUID) (*domain.Ticket, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -71,5 +83,35 @@ func TestTicketHandlerGetDeniesCrossCompany(t *testing.T) {
 
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, recorder.Code)
+	}
+}
+
+func TestTicketHandlerListInvalidStatus(t *testing.T) {
+	handler := NewTicketHandler(ticketServiceStub{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/tickets?status=bogus", nil)
+	ctx := middleware.WithUserContext(req.Context(), uuid.New(), uuid.New(), domain.RoleAdmin)
+	req = req.WithContext(ctx)
+
+	recorder := httptest.NewRecorder()
+	handler.List(recorder, req)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, recorder.Code)
+	}
+}
+
+func TestTicketHandlerListInvalidCursor(t *testing.T) {
+	handler := NewTicketHandler(ticketServiceStub{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/tickets?cursor=bad", nil)
+	ctx := middleware.WithUserContext(req.Context(), uuid.New(), uuid.New(), domain.RoleAdmin)
+	req = req.WithContext(ctx)
+
+	recorder := httptest.NewRecorder()
+	handler.List(recorder, req)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, recorder.Code)
 	}
 }

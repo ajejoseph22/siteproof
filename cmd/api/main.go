@@ -123,6 +123,7 @@ func main() {
 
 			// Tickets
 			r.Route("/tickets", func(r chi.Router) {
+				r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/", ticketHandler.List)
 				r.With(
 					middleware.RequirePermission(domain.PermissionTicketWrite),
 					middleware.Idempotency(queries),

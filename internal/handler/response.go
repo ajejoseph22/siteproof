@@ -87,6 +87,21 @@ func WritePaginated(w http.ResponseWriter, data interface{}, limit, offset, tota
 	})
 }
 
+// WriteCursorPaginated writes a cursor-paginated response.
+func WriteCursorPaginated(w http.ResponseWriter, data interface{}, limit int, nextCursor string, hasMore bool) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(PaginatedResponse{
+		Data: data,
+		Pagination: PaginationMetadata{
+			Limit:      limit,
+			Offset:     0,
+			NextCursor: nextCursor,
+			HasMore:    hasMore,
+		},
+	})
+}
+
 // DecodeJSON decodes a JSON request body.
 func DecodeJSON(r *http.Request, v interface{}) error {
 	return json.NewDecoder(r.Body).Decode(v)
