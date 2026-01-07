@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 // Config holds all application configuration.
@@ -16,6 +19,7 @@ type Config struct {
 	OpenAI   OpenAIConfig
 	Postmark PostmarkConfig
 	Twilio   TwilioConfig
+	OAuth    OAuthConfig
 	Storage  StorageConfig
 }
 
@@ -67,6 +71,20 @@ type TwilioConfig struct {
 	Timeout    time.Duration
 }
 
+// OAuthConfig holds OAuth provider configuration.
+type OAuthConfig struct {
+	Microsoft MicrosoftOAuthConfig
+}
+
+// MicrosoftOAuthConfig holds Microsoft OAuth configuration.
+type MicrosoftOAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	TenantID     string
+	RedirectURL  string
+	Scopes       []string
+}
+
 // StorageConfig holds file storage configuration.
 type StorageConfig struct {
 	BasePath     string
@@ -77,6 +95,10 @@ type StorageConfig struct {
 // Load reads configuration from environment variables.
 // It returns an error if required variables are missing.
 func Load() (*Config, error) {
+	if err := loadEnvFile(); err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
 		Server: ServerConfig{
 			Host:         getEnv("SERVER_HOST", "0.0.0.0"),
@@ -113,6 +135,15 @@ func Load() (*Config, error) {
 			AuthToken:  getEnv("TWILIO_AUTH_TOKEN", ""),
 			FromNumber: getEnv("TWILIO_FROM_NUMBER", ""),
 			Timeout:    getEnvDuration("TWILIO_TIMEOUT", 5*time.Second),
+		},
+		OAuth: OAuthConfig{
+			Microsoft: MicrosoftOAuthConfig{
+				ClientID:     getEnv("OAUTH_MICROSOFT_CLIENT_ID", ""),
+				ClientSecret: getEnv("OAUTH_MICROSOFT_CLIENT_SECRET", ""),
+				TenantID:     getEnv("OAUTH_MICROSOFT_TENANT_ID", ""),
+				RedirectURL:  getEnv("OAUTH_MICROSOFT_REDIRECT_URL", ""),
+				Scopes:       getEnvCSV("OAUTH_MICROSOFT_SCOPES", []string{"openid", "profile", "email"}),
+			},
 		},
 		Storage: StorageConfig{
 			BasePath:    getEnv("STORAGE_BASE_PATH", "/data/uploads"),
@@ -152,6 +183,28 @@ func (c *ServerConfig) Addr() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
 }
 
+func loadEnvFile() error {
+	if configPath := os.Getenv("CONFIG_FILE"); configPath != "" {
+		if _, err := os.Stat(configPath); err != nil {
+			return fmt.Errorf("failed to read config file %s: %w", configPath, err)
+		}
+		if err := godotenv.Load(configPath); err != nil {
+			return fmt.Errorf("failed to load config file %s: %w", configPath, err)
+		}
+		return nil
+	}
+
+	if _, err := os.Stat(".env"); err == nil {
+		if err := godotenv.Load(); err != nil {
+			return fmt.Errorf("failed to load .env: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to stat .env: %w", err)
+	}
+
+	return nil
+}
+
 // Helper functions for environment variable parsing.
 
 func getEnv(key, defaultValue string) string {
@@ -187,6 +240,23 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 	if value := os.Getenv(key); value != "" {
 		if d, err := time.ParseDuration(value); err == nil {
 			return d
+		}
+	}
+	return defaultValue
+}
+
+func getEnvCSV(key string, defaultValue []string) []string {
+	if value := os.Getenv(key); value != "" {
+		parts := strings.Split(value, ",")
+		values := make([]string, 0, len(parts))
+		for _, part := range parts {
+			trimmed := strings.TrimSpace(part)
+			if trimmed != "" {
+				values = append(values, trimmed)
+			}
+		}
+		if len(values) > 0 {
+			return values
 		}
 	}
 	return defaultValue

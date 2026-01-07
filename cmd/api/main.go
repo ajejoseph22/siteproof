@@ -10,25 +10,20 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
-
 	"github.com/ajejoseph22/siteproof/internal/config"
 	"github.com/ajejoseph22/siteproof/internal/handler"
 	"github.com/ajejoseph22/siteproof/internal/middleware"
 	"github.com/ajejoseph22/siteproof/internal/service"
+	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Version is set at build time.
 var Version = "dev"
 
 func main() {
-	// Load .env file if it exists
-	_ = godotenv.Load()
-
 	// Setup structured logging
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
