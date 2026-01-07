@@ -21,6 +21,7 @@ const (
 	AuditActionLocked             AuditAction = "locked"
 	AuditActionRejected           AuditAction = "rejected"
 	AuditActionPhotoAdded         AuditAction = "photo_added"
+	AuditActionPhotoDeleted       AuditAction = "photo_deleted"
 	AuditActionDescriptionCleaned AuditAction = "description_cleaned"
 	AuditActionEmailSent          AuditAction = "email_sent"
 	AuditActionLineItemAdded      AuditAction = "line_item_added"

@@ -229,7 +229,11 @@
       "Save files under /data/uploads/{company_id}/photos/{ticket_id}",
       "Return file paths and thumbnail URLs in the response"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Added PhotoService + PhotoHandler for multipart uploads with SHA-256 verification, metadata parsing, and storage under {storage_base}/{company_id}/photos/{ticket_id}.",
+      "Responses include file_path plus file_url/thumbnail_url (thumbnail_url mirrors file_url for now); list and delete endpoints added with audit log entries."
+    ]
   },
   {
     "category": "backend",

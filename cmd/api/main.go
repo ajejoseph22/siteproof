@@ -60,6 +60,7 @@ func main() {
 	userService := service.NewUserService(pool)
 	projectService := service.NewProjectService(pool)
 	ticketService := service.NewTicketService(pool)
+	photoService := service.NewPhotoService(pool)
 	queries := db.New(pool)
 
 	// Initialize handlers
@@ -67,6 +68,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	projectHandler := handler.NewProjectHandler(projectService)
 	ticketHandler := handler.NewTicketHandler(ticketService)
+	photoHandler := handler.NewPhotoHandler(photoService, cfg.Storage.BasePath, cfg.Storage.MaxFileSize, cfg.Storage.AllowedTypes)
 
 	// Suppress unused variable warning (userService will be used later)
 	_ = userService
@@ -140,6 +142,14 @@ func main() {
 					).Post("/", ticketHandler.CreateLineItem)
 					r.With(middleware.RequirePermission(domain.PermissionTicketWrite)).Patch("/{line_item_id}", ticketHandler.UpdateLineItem)
 					r.With(middleware.RequirePermission(domain.PermissionTicketWrite)).Delete("/{line_item_id}", ticketHandler.DeleteLineItem)
+				})
+				r.Route("/{id}/photos", func(r chi.Router) {
+					r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/", photoHandler.List)
+					r.With(
+						middleware.RequirePermission(domain.PermissionTicketWrite),
+						middleware.Idempotency(queries),
+					).Post("/", photoHandler.Upload)
+					r.With(middleware.RequirePermission(domain.PermissionTicketWrite)).Delete("/{photo_id}", photoHandler.Delete)
 				})
 			})
 		})

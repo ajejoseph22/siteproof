@@ -11,3 +11,5 @@ Standardized API error handling: added APIError mapping + WriteErrorFrom, update
 Completed line item management: added list/create/update/delete endpoints, draft-only enforcement with audit log entries, and ticket line_items_total aggregation migration. make test failed due to Go build cache permission.
 
 Completed health check endpoint: added storage readiness checks with timeouts, expanded /health payload, and added handler tests. make test failed due to Go build cache permission in /Users/joseph/Library/Caches/go-build.
+
+Completed photo upload PRD item: added photo upload/list/delete service+handler with multipart parsing, SHA-256 verification, storage under storage base path, audit logs, and file_url/thumbnail_url responses (thumbnail_url mirrors file_url). make test failed: missing github.com/jackc/pgconn module.

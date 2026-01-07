@@ -43,6 +43,9 @@ func (i *CreatePhotoInput) Validate() error {
 	if i.TicketID == uuid.Nil {
 		errs.Add("ticket_id", "is required")
 	}
+	if i.UploadedByID == uuid.Nil {
+		errs.Add("uploaded_by_id", "is required")
+	}
 	if i.FilePath == "" {
 		errs.Add("file_path", "is required")
 	}
