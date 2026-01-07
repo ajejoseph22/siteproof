@@ -219,3 +219,40 @@
 - Wired AuditHandler routes in `cmd/api/main.go` under `/tickets/{id}/audit-logs`
 - All endpoints require `ticket:read` permission (RBAC enforced)
 - `make build` and `make test` pass
+
+## Frontend: Web Auth Screens and Token Handling
+- Implemented registration page (`client/src/pages/RegisterPage.tsx`):
+  - Full form with Company Name, Your Name, Email, Phone (optional), Password, Confirm Password
+  - Form validation using react-hook-form + Zod with zodResolver
+  - Password confirmation matching validation
+  - Terms of Service checkbox (HTML5 required)
+  - Responsive design matching LoginPage styling (construction tape decoration, dark mode support)
+  - Animated error messages using framer-motion
+- Added register API function (`client/src/lib/api/auth.ts`):
+  - `RegisterInput` interface and `register()` function
+  - Demo mode support returns mock user/company based on input
+  - Real API call to `POST /api/v1/auth/register`
+  - Automatic token storage on successful registration
+- Extended Zustand store (`client/src/stores/app.ts`):
+  - Added `register` action with same flow as login
+  - Loads mock projects/tickets in demo mode after registration
+- Updated routing (`client/src/App.tsx`):
+  - Added `/register` route under public routes
+  - RegisterPage imported and wired
+- Added navigation links:
+  - LoginPage: "Don't have an account? Create account" link to /register
+  - RegisterPage: "Already have an account? Sign in" link to /login
+- JWT token handling (already implemented, verified working):
+  - `setTokens()` stores access/refresh tokens with expiry in localStorage
+  - `isTokenExpired()` checks with 1-minute buffer
+  - `refreshAccessToken()` auto-refreshes before requests
+  - Authorization header attached to all authenticated requests
+- Auth error handling (already implemented, verified working):
+  - `ApiException` class with status and error details
+  - Errors displayed inline on forms
+  - Session expiry triggers 401 with clear message
+- Sign out flow (already implemented, verified working):
+  - `clearTokens()` removes from localStorage
+  - Store `logout()` action clears user/company/projects/tickets state
+- All changed files pass ESLint
+- Verified registration flow via Playwright MCP (form renders, validation works, API calls made)

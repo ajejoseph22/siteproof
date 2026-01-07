@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
@@ -207,8 +207,21 @@ export function LoginPage() {
               </Button>
             </form>
 
+            {/* Sign Up Link */}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-charcoal-500 dark:text-charcoal-400">
+                Don't have an account?{' '}
+                <Link
+                  to="/register"
+                  className="text-safety-500 hover:text-safety-600 dark:hover:text-safety-400 font-medium hover:underline transition-colors"
+                >
+                  Create account
+                </Link>
+              </p>
+            </div>
+
             {/* Demo Notice */}
-            <div className="mt-6 p-4 rounded-xl bg-charcoal-50 dark:bg-charcoal-800/50 border-2 border-charcoal-100 dark:border-charcoal-700/50 text-center">
+            <div className="mt-4 p-4 rounded-xl bg-charcoal-50 dark:bg-charcoal-800/50 border-2 border-charcoal-100 dark:border-charcoal-700/50 text-center">
               <p className="text-sm font-semibold text-charcoal-700 dark:text-charcoal-300 mb-1">
                 Demo Mode Active
               </p>

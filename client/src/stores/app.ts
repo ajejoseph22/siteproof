@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Company, Project, Ticket } from '@/types';
-import { authApi, projectsApi, ticketsApi, isDemoMode } from '@/lib/api';
+import { authApi, projectsApi, ticketsApi, isDemoMode, type RegisterInput } from '@/lib/api';
 import { mockProjects, mockTickets } from '@/data/mock';
 
 // Get system preference
@@ -43,6 +43,7 @@ interface AppState {
 
   // Actions
   login: (email: string, password: string) => Promise<boolean>;
+  register: (input: RegisterInput) => Promise<boolean>;
   logout: () => void;
   toggleDarkMode: () => void;
   setThemePreference: (preference: 'light' | 'dark' | 'system') => void;
@@ -78,6 +79,26 @@ export const useAppStore = create<AppState>()(
       // Auth actions
       login: async (email: string, password: string) => {
         const result = await authApi.login(email, password);
+
+        if (result) {
+          // In demo mode, also load mock data
+          const projectsData = isDemoMode() ? mockProjects : await projectsApi.listProjects();
+          const ticketsData = isDemoMode() ? mockTickets : await ticketsApi.listTickets();
+
+          set({
+            isAuthenticated: true,
+            user: result.user,
+            company: result.company,
+            projects: projectsData,
+            tickets: ticketsData,
+          });
+          return true;
+        }
+        return false;
+      },
+
+      register: async (input: RegisterInput) => {
+        const result = await authApi.register(input);
 
         if (result) {
           // In demo mode, also load mock data

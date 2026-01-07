@@ -4,6 +4,7 @@ import { useAppStore } from '@/stores/app';
 import { AppLayout } from '@/components/layout/AppLayout';
 import {
   LoginPage,
+  RegisterPage,
   DashboardPage,
   ProjectsPage,
   TicketsPage,
@@ -49,6 +50,7 @@ export default function App() {
           {/* Public routes */}
           <Route element={<PublicRoute />}>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
           </Route>
 
           {/* Protected routes */}
