@@ -173,7 +173,11 @@
       "Add response header X-Idempotent-Replayed when reused",
       "Apply middleware to ticket creation and signature request endpoints"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Added idempotency middleware that hashes key + method + path, replays cached responses with X-Idempotent-Replayed, and stores successful JSON responses for 24 hours.",
+      "Applied idempotency middleware to POST /api/v1/tickets; signature request endpoints will use the same middleware when they are introduced."
+    ]
   },
   {
     "category": "backend",

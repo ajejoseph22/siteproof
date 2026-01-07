@@ -13,6 +13,7 @@ import (
 	"github.com/ajejoseph22/siteproof/internal/config"
 	"github.com/ajejoseph22/siteproof/internal/handler"
 	"github.com/ajejoseph22/siteproof/internal/middleware"
+	"github.com/ajejoseph22/siteproof/internal/repository/db"
 	"github.com/ajejoseph22/siteproof/internal/service"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -58,6 +59,7 @@ func main() {
 	userService := service.NewUserService(pool)
 	projectService := service.NewProjectService(pool)
 	ticketService := service.NewTicketService(pool)
+	queries := db.New(pool)
 
 	// Initialize handlers
 	healthHandler := handler.NewHealthHandler(pool, Version)
@@ -83,7 +85,7 @@ func main() {
 		AllowedOrigins:   []string{"*"}, // Configure for production
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"},
-		ExposedHeaders:   []string{"X-Request-ID"},
+		ExposedHeaders:   []string{"X-Request-ID", "X-Idempotent-Replayed"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -120,7 +122,7 @@ func main() {
 
 			// Tickets
 			r.Route("/tickets", func(r chi.Router) {
-				r.Post("/", ticketHandler.Create)
+				r.With(middleware.Idempotency(queries)).Post("/", ticketHandler.Create)
 				r.Get("/{id}", ticketHandler.Get)
 				r.Patch("/{id}", ticketHandler.Update)
 				r.Post("/{id}/submit", ticketHandler.Submit)
