@@ -64,6 +64,7 @@ func main() {
 	fileService := service.NewFileService(pool)
 	queries := db.New(pool)
 	signingLinkService := service.NewSigningLinkService(pool, queries, cfg.Server.BaseURL)
+	signatureService := service.NewSignatureService(pool, queries)
 
 	// Initialize handlers
 	healthHandler := handler.NewHealthHandler(pool, cfg.Storage.BasePath, Version)
@@ -73,6 +74,7 @@ func main() {
 	photoHandler := handler.NewPhotoHandler(photoService, cfg.Storage.BasePath, cfg.Storage.MaxFileSize, cfg.Storage.AllowedTypes)
 	fileHandler := handler.NewFileHandler(fileService, cfg.Storage.BasePath)
 	signingLinkHandler := handler.NewSigningLinkHandler(signingLinkService)
+	signatureHandler := handler.NewSignatureHandler(signatureService, cfg.Storage.BasePath)
 
 	// Suppress unused variable warning (userService will be used later)
 	_ = userService
@@ -112,6 +114,8 @@ func main() {
 
 		// Public signing link validation (for GC accessing signing page)
 		r.Get("/sign/{token}", signingLinkHandler.ValidateToken)
+		// Public signature capture via token (for GC submitting signature)
+		r.Post("/sign/{token}/signature", signatureHandler.CaptureViaToken)
 
 		// Protected routes
 		r.Group(func(r chi.Router) {
@@ -166,6 +170,14 @@ func main() {
 						middleware.Idempotency(queries),
 					).Post("/", signingLinkHandler.RequestSignature)
 					r.With(middleware.RequirePermission(domain.PermissionSignatureRequest)).Delete("/", signingLinkHandler.RevokeSigningLinks)
+				})
+				// Signature endpoints (for foreman internal signatures and listing)
+				r.Route("/{id}/signatures", func(r chi.Router) {
+					r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/", signatureHandler.List)
+					r.With(
+						middleware.RequirePermission(domain.PermissionTicketWrite),
+						middleware.Idempotency(queries),
+					).Post("/", signatureHandler.CaptureForeman)
 				})
 			})
 

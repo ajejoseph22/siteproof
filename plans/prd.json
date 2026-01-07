@@ -306,7 +306,20 @@
       "Update ticket status based on signer type and rules",
       "Prevent duplicate signatures of the same type"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Created SignatureService with CaptureSignature (public via token) and CaptureInternalSignature (authenticated foreman) methods.",
+      "Created SignatureHandler with multipart form parsing for PNG signature images, SHA-256 hash verification, and client IP/User-Agent capture.",
+      "Added public POST /api/v1/sign/{token}/signature endpoint for GC signature capture via signing link.",
+      "Added protected POST /api/v1/tickets/{id}/signatures endpoint for foreman signatures (draft tickets only).",
+      "Added GET /api/v1/tickets/{id}/signatures endpoint to list signatures for a ticket.",
+      "GC signatures require ticket in pending_review status; upon GC signature, ticket status auto-transitions to approved.",
+      "Foreman signatures require ticket in draft status (before submission).",
+      "Duplicate signatures of same signer_type prevented via unique constraint and service-level check.",
+      "Signature files stored under {storage_base}/{company_id}/signatures/{ticket_id}/{uuid}.png.",
+      "Audit log entries created with AuditActionSigned capturing signature_id, signer_type, signer_name, signature_hash, signing_method, and status_change.",
+      "Signing link marked as used when signature is captured via token flow."
+    ]
   },
   {
     "category": "backend",

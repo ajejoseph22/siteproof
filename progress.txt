@@ -163,3 +163,37 @@
   - Actual sending deferred to Postmark/Twilio integration PRD items
   - Events logged for future email/SMS service integration
 - `make build` and `make test` pass
+
+## Signature Capture Flow
+- Implemented signature capture for both GC (via signing link) and foreman (authenticated):
+  - Created `SignatureService` in `internal/service/signature.go`:
+    - `CaptureSignature`: Public signature capture via token for GC superintendents
+    - `CaptureInternalSignature`: Authenticated signature capture for foremen
+    - `ListByTicket`: List all signatures for a ticket
+    - `GetByID`: Get signature by ID with company scoping
+  - Created `SignatureHandler` in `internal/handler/signature.go`:
+    - Multipart form parsing for PNG signature images
+    - SHA-256 hash verification (client must provide hash for integrity check)
+    - Client IP address and User-Agent capture for audit trail
+    - Device ID capture for fraud detection
+- Endpoints:
+  - `POST /api/v1/sign/{token}/signature` - Public endpoint for GC signature capture
+  - `POST /api/v1/tickets/{id}/signatures` - Protected endpoint for foreman signatures
+  - `GET /api/v1/tickets/{id}/signatures` - List signatures for a ticket
+- Status transitions:
+  - GC signature on pending_review ticket auto-transitions to approved status
+  - Foreman signature only allowed on draft tickets (before submission)
+- Duplicate prevention:
+  - Database unique constraint `signatures_one_per_type` prevents duplicate signer types
+  - Service-level check returns `DUPLICATE_SIGNATURE` error code
+- File storage:
+  - Signatures stored under `{storage_base}/{company_id}/signatures/{ticket_id}/{uuid}.png`
+  - Only PNG format accepted for signature images
+  - Max file size: 5MB
+- Audit logging:
+  - `AuditActionSigned` action captures signature details and status change
+  - Actor IP recorded for external signers
+- Signing link integration:
+  - Validates token expiry, used, and revoked status
+  - Marks signing link as used after successful signature capture
+- `make build` and `make test` pass
