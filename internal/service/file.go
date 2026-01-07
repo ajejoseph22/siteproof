@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"net"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -143,9 +145,10 @@ func scanSignatureRow(row pgx.Row) (*domain.Signature, error) {
 
 	// Parse IP address if present
 	if ipStr != nil {
-		// IP is stored as inet type, scan as string
-		// The domain.Signature.IPAddress is *net.IP which we'll handle at the domain level
-		// For now, leave as nil since we're just using it for file access
+		parsed := net.ParseIP(strings.TrimSpace(*ipStr))
+		if parsed != nil {
+			sig.IPAddress = &parsed
+		}
 	}
 
 	return &sig, nil

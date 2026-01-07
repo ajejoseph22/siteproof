@@ -98,7 +98,9 @@ func (s *SigningLinkService) RequestSignature(
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	txQueries := s.queries.WithTx(tx)
 
@@ -233,7 +235,9 @@ func (s *SigningLinkService) RevokeByTicket(ctx context.Context, companyID, tick
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	txQueries := s.queries.WithTx(tx)
 

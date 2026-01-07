@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	signatureMetadataMaxBytes = int64(512 * 1024) // 512KB for metadata
-	signatureFieldMaxBytes    = int64(32 * 1024)  // 32KB per field
+	signatureMetadataMaxBytes = int64(512 * 1024)      // 512KB for metadata
+	signatureFieldMaxBytes    = int64(32 * 1024)       // 32KB per field
 	signatureMaxFileSize      = int64(5 * 1024 * 1024) // 5MB max signature image
 )
 
@@ -55,14 +55,14 @@ func NewSignatureHandler(signatureService SignatureService, storageBase string) 
 
 // SignatureResponse represents a signature in API responses.
 type SignatureResponse struct {
-	ID            uuid.UUID  `json:"id"`
-	TicketID      uuid.UUID  `json:"ticket_id"`
-	SignerType    string     `json:"signer_type"`
-	SignerName    string     `json:"signer_name"`
-	SignerEmail   *string    `json:"signer_email,omitempty"`
-	SignatureURL  string     `json:"signature_url"`
-	SigningMethod string     `json:"signing_method"`
-	SignedAt      time.Time  `json:"signed_at"`
+	ID            uuid.UUID `json:"id"`
+	TicketID      uuid.UUID `json:"ticket_id"`
+	SignerType    string    `json:"signer_type"`
+	SignerName    string    `json:"signer_name"`
+	SignerEmail   *string   `json:"signer_email,omitempty"`
+	SignatureURL  string    `json:"signature_url"`
+	SigningMethod string    `json:"signing_method"`
+	SignedAt      time.Time `json:"signed_at"`
 }
 
 func newSignatureResponse(r *http.Request, sig *domain.Signature) SignatureResponse {
@@ -117,7 +117,9 @@ func (h *SignatureHandler) CaptureViaToken(w http.ResponseWriter, r *http.Reques
 
 	sig, err := h.signatureService.CaptureSignature(r.Context(), token, input)
 	if err != nil {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup signature file", slog.String("error", err.Error()))
+		}
 		WriteErrorFrom(w, err)
 		return
 	}
@@ -166,7 +168,9 @@ func (h *SignatureHandler) CaptureForeman(w http.ResponseWriter, r *http.Request
 
 	sig, err := h.signatureService.CaptureInternalSignature(r.Context(), companyID, ticketID, userID, input)
 	if err != nil {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup signature file", slog.String("error", err.Error()))
+		}
 		WriteErrorFrom(w, err)
 		return
 	}
@@ -213,14 +217,14 @@ func (h *SignatureHandler) parseSignatureUpload(r *http.Request) (*service.Captu
 	}
 
 	var (
-		signerName      string
-		signerEmail     string
-		signingMethod   string
-		deviceID        string
-		clientHashRaw   string
+		signerName    string
+		signerEmail   string
+		signingMethod string
+		deviceID      string
+		clientHashRaw string
 
-		filePath      string
-		fileHash      string
+		filePath string
+		fileHash string
 	)
 
 	var parseErr error
@@ -282,7 +286,9 @@ func (h *SignatureHandler) parseSignatureUpload(r *http.Request) (*service.Captu
 	}
 
 	if parseErr != nil {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup signature file", slog.String("error", err.Error()))
+		}
 		return nil, "", parseErr
 	}
 
@@ -308,13 +314,17 @@ func (h *SignatureHandler) parseSignatureUpload(r *http.Request) (*service.Captu
 	}
 
 	if validationErrs.HasErrors() {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup signature file", slog.String("error", err.Error()))
+		}
 		return nil, "", validationErrs
 	}
 
 	// Verify hash
 	if clientHash != fileHash {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup signature file", slog.String("error", err.Error()))
+		}
 		return nil, "", domain.NewDomainError(domain.ErrValidation, "HASH_MISMATCH", "client hash does not match uploaded signature")
 	}
 
@@ -346,14 +356,14 @@ func (h *SignatureHandler) parseSignatureUploadForTicket(r *http.Request, compan
 	}
 
 	var (
-		signerName      string
-		signerEmail     string
-		signingMethod   string
-		deviceID        string
-		clientHashRaw   string
+		signerName    string
+		signerEmail   string
+		signingMethod string
+		deviceID      string
+		clientHashRaw string
 
-		filePath      string
-		fileHash      string
+		filePath string
+		fileHash string
 	)
 
 	var parseErr error
@@ -414,7 +424,9 @@ func (h *SignatureHandler) parseSignatureUploadForTicket(r *http.Request, compan
 	}
 
 	if parseErr != nil {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup signature file", slog.String("error", err.Error()))
+		}
 		return nil, "", parseErr
 	}
 
@@ -440,13 +452,17 @@ func (h *SignatureHandler) parseSignatureUploadForTicket(r *http.Request, compan
 	}
 
 	if validationErrs.HasErrors() {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup signature file", slog.String("error", err.Error()))
+		}
 		return nil, "", validationErrs
 	}
 
 	// Verify hash
 	if clientHash != fileHash {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup signature file", slog.String("error", err.Error()))
+		}
 		return nil, "", domain.NewDomainError(domain.ErrValidation, "HASH_MISMATCH", "client hash does not match uploaded signature")
 	}
 
@@ -493,7 +509,9 @@ func (h *SignatureHandler) storeSignatureFile(part *multipart.Part, companyOrPen
 	if err != nil {
 		return "", "", fmt.Errorf("create signature file: %w", err)
 	}
-	defer dest.Close()
+	defer func() {
+		_ = dest.Close()
+	}()
 
 	hash := sha256.New()
 	writer := io.MultiWriter(dest, hash)

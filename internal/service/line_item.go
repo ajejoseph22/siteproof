@@ -57,7 +57,9 @@ func (s *TicketService) CreateLineItem(ctx context.Context, companyID, ticketID,
 	if err != nil {
 		return nil, fmt.Errorf("begin line item create: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	status, previousTotal, err := s.lockTicketForLineItems(ctx, tx, companyID, ticketID)
 	if err != nil {
@@ -122,7 +124,9 @@ func (s *TicketService) UpdateLineItem(ctx context.Context, companyID, ticketID,
 	if err != nil {
 		return nil, fmt.Errorf("begin line item update: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	status, previousTotal, err := s.lockTicketForLineItems(ctx, tx, companyID, ticketID)
 	if err != nil {
@@ -197,7 +201,9 @@ func (s *TicketService) DeleteLineItem(ctx context.Context, companyID, ticketID,
 	if err != nil {
 		return fmt.Errorf("begin line item delete: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	status, previousTotal, err := s.lockTicketForLineItems(ctx, tx, companyID, ticketID)
 	if err != nil {

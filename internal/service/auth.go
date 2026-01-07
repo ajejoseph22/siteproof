@@ -106,7 +106,9 @@ func (s *AuthService) Register(ctx context.Context, input *domain.RegisterInput)
 	if err != nil {
 		return nil, nil, fmt.Errorf("begin registration: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var exists bool
 	if err := tx.QueryRow(ctx, `

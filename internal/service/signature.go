@@ -95,7 +95,9 @@ func (s *SignatureService) CaptureSignature(
 	if err != nil {
 		return nil, fmt.Errorf("begin signature capture: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	txQueries := s.queries.WithTx(tx)
 
@@ -259,7 +261,9 @@ func (s *SignatureService) CaptureInternalSignature(
 	if err != nil {
 		return nil, fmt.Errorf("begin internal signature: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	txQueries := s.queries.WithTx(tx)
 

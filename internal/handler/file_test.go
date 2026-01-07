@@ -143,7 +143,9 @@ func TestFileHandlerDownloadPhotoSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	// Create a test photo file
 	testPhotoPath := filepath.Join(tmpDir, "test", "photo.jpg")
@@ -207,7 +209,9 @@ func TestFileHandlerDownloadPhotoConditionalRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	// Create a test photo file
 	testPhotoPath := filepath.Join(tmpDir, "test", "photo.jpg")
@@ -342,7 +346,9 @@ func TestFileHandlerPathTraversalPrevented(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	companyID := uuid.New()
 	photoID := uuid.New()
@@ -381,7 +387,9 @@ func TestFileHandlerDownloadSignatureSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	// Create a test signature file
 	testSignaturePath := filepath.Join(tmpDir, "test", "signature.png")
@@ -445,7 +453,9 @@ func TestFileHandlerDownloadPDFSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	// Create a test PDF file
 	testPDFPath := filepath.Join(tmpDir, "test", "ticket.pdf")

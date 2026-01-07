@@ -66,7 +66,9 @@ func (s *PhotoService) Create(ctx context.Context, companyID, ticketID, actorID 
 	if err != nil {
 		return nil, fmt.Errorf("begin photo create: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	status, err := s.lockTicket(ctx, tx, companyID, ticketID)
 	if err != nil {
@@ -123,7 +125,9 @@ func (s *PhotoService) Delete(ctx context.Context, companyID, ticketID, photoID,
 	if err != nil {
 		return nil, fmt.Errorf("begin photo delete: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	status, err := s.lockTicket(ctx, tx, companyID, ticketID)
 	if err != nil {

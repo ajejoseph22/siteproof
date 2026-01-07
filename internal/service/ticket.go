@@ -34,7 +34,9 @@ func (s *TicketService) Create(ctx context.Context, input *domain.CreateTicketIn
 	if err != nil {
 		return nil, fmt.Errorf("begin ticket create: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var projectExists bool
 	err = tx.QueryRow(ctx, `
@@ -250,7 +252,9 @@ func (s *TicketService) Update(ctx context.Context, companyID, id, actorID uuid.
 	if err != nil {
 		return nil, fmt.Errorf("begin ticket update: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var updated domain.Ticket
 	err = tx.QueryRow(ctx, `
@@ -323,7 +327,9 @@ func (s *TicketService) SubmitForReview(ctx context.Context, companyID, id, acto
 	if err != nil {
 		return nil, fmt.Errorf("begin ticket submit: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var updated domain.Ticket
 	err = tx.QueryRow(ctx, `
@@ -384,7 +390,9 @@ func (s *TicketService) Approve(ctx context.Context, companyID, id, signerID uui
 	if err != nil {
 		return nil, fmt.Errorf("begin ticket approve: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var updated domain.Ticket
 	err = tx.QueryRow(ctx, `
@@ -456,7 +464,9 @@ func (s *TicketService) Reject(ctx context.Context, companyID, id, rejectorID uu
 	if err != nil {
 		return nil, fmt.Errorf("begin ticket reject: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var updated domain.Ticket
 	err = tx.QueryRow(ctx, `
@@ -526,7 +536,9 @@ func (s *TicketService) Lock(ctx context.Context, companyID, id uuid.UUID, pdfPa
 	if err != nil {
 		return nil, fmt.Errorf("begin ticket lock: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var updated domain.Ticket
 	err = tx.QueryRow(ctx, `

@@ -173,7 +173,9 @@ func (h *FileHandler) serveFile(w http.ResponseWriter, r *http.Request, relative
 		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to read file")
 		return
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	// Get file info for size and mod time
 	stat, err := file.Stat()

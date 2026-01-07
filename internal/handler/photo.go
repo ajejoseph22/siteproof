@@ -191,7 +191,9 @@ func (h *PhotoHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if parseErr != nil {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup photo file", slog.String("error", err.Error()))
+		}
 		WriteErrorFrom(w, parseErr)
 		return
 	}
@@ -232,20 +234,26 @@ func (h *PhotoHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if validationErrs.HasErrors() {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup photo file", slog.String("error", err.Error()))
+		}
 		WriteErrorFrom(w, validationErrs)
 		return
 	}
 
 	if clientHash != "" && fileHash != "" && clientHash != fileHash {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup photo file", slog.String("error", err.Error()))
+		}
 		WriteError(w, http.StatusBadRequest, "HASH_MISMATCH", "client hash does not match uploaded file")
 		return
 	}
 
 	fileSizeInt, err := safeFileSize(fileSize)
 	if err != nil {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup photo file", slog.String("error", err.Error()))
+		}
 		WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "file size exceeds limits")
 		return
 	}
@@ -270,7 +278,9 @@ func (h *PhotoHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	photo, err := h.photoService.Create(r.Context(), companyID, ticketID, userID, input)
 	if err != nil {
-		h.cleanupFile(filePath)
+		if err := h.cleanupFile(filePath); err != nil {
+			slog.Default().Warn("failed to cleanup photo file", slog.String("error", err.Error()))
+		}
 		WriteErrorFrom(w, err)
 		return
 	}
@@ -382,7 +392,9 @@ func (h *PhotoHandler) storePhotoFile(part *multipart.Part, companyID, ticketID 
 	if err != nil {
 		return "", 0, "", "", fmt.Errorf("create photo file: %w", err)
 	}
-	defer dest.Close()
+	defer func() {
+		_ = dest.Close()
+	}()
 
 	hash := sha256.New()
 	writer := io.MultiWriter(dest, hash)
