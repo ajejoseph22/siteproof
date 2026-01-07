@@ -246,33 +246,30 @@ Let's walk through what happens when the server starts:
 
 ```go
 func main() {
-    // 1. Load environment variables from .env file
-    _ = godotenv.Load()
-
-    // 2. Setup JSON logging (structured logs are easier to search)
+    // 1. Setup JSON logging (structured logs are easier to search)
     logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-    // 3. Load configuration from environment
+    // 2. Load configuration from environment (optional .env supported)
     cfg, err := config.Load()
 
-    // 4. Connect to PostgreSQL database
+    // 3. Connect to PostgreSQL database
     pool, err := pgxpool.New(ctx, cfg.Database.URL)
 
-    // 5. Create services (business logic)
+    // 4. Create services (business logic)
     authService := service.NewAuthService(pool, &cfg.JWT)
     ticketService := service.NewTicketService(pool)
 
-    // 6. Create handlers (HTTP endpoints)
+    // 5. Create handlers (HTTP endpoints)
     authHandler := handler.NewAuthHandler(authService)
     ticketHandler := handler.NewTicketHandler(ticketService)
 
-    // 7. Setup router with routes
+    // 6. Setup router with routes
     r := chi.NewRouter()
     r.Post("/api/v1/auth/login", authHandler.Login)
     r.Post("/api/v1/tickets", ticketHandler.Create)
     // ...more routes
 
-    // 8. Start HTTP server
+    // 7. Start HTTP server
     srv := &http.Server{Addr: ":8080", Handler: r}
     srv.ListenAndServe()
 }
@@ -963,4 +960,3 @@ Key security features:
 ---
 
 *Happy coding! 🚀*
-

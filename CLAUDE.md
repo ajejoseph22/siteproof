@@ -93,8 +93,7 @@ JWT tokens with access/refresh pattern. Access tokens are short-lived, refresh t
 ## Environment Variables
 
 Key variables (see `.env.example`):
-- `DATABASE_URL` - PostgreSQL connection string
-- `JWT_SECRET` - JWT signing key
-- `POSTMARK_API_KEY` - Email delivery
-- `OPENAI_API_KEY` - Voice transcription cleanup
-- `TWILIO_ACCOUNT_SID` - SMS for signature verification
+- Backend loads `.env` from the repo root by default; set `CONFIG_FILE` to point at a different env file.
+- Required: `DATABASE_URL` (PostgreSQL connection string) and `JWT_SECRET` (JWT signing key, 32+ chars).
+- Integrations: `POSTMARK_API_KEY` (email), `OPENAI_API_KEY` (voice cleanup), `TWILIO_ACCOUNT_SID` (SMS), `OAUTH_MICROSOFT_CLIENT_ID` (SSO).
+- Server and storage tuning variables are listed in `.env.example` (e.g., `SERVER_PORT`, `STORAGE_BASE_PATH`).
