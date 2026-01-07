@@ -365,7 +365,15 @@
       "Log key events like ticket_created and ticket_locked",
       "Ensure logs include user_id and company_id when available"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Created pkg/slogctx package providing context-aware structured logging with Info/Debug/Warn/Error helpers.",
+      "Updated Logging middleware to attach request-scoped logger with request_id to context, and include user_id/company_id in http_request logs when available.",
+      "Added structured event logging throughout services: ticket_created, ticket_updated, ticket_submitted, ticket_approved, ticket_rejected, ticket_locked in TicketService.",
+      "Added user_login, user_registered, user_logout events in AuthService.",
+      "Added photo_uploaded event in PhotoService.",
+      "All logs automatically inherit request_id from context when available."
+    ]
   },
   {
     "category": "ops",

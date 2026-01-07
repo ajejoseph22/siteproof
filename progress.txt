@@ -13,3 +13,5 @@ Completed line item management: added list/create/update/delete endpoints, draft
 Completed health check endpoint: added storage readiness checks with timeouts, expanded /health payload, and added handler tests. make test failed due to Go build cache permission in /Users/joseph/Library/Caches/go-build.
 
 Completed photo upload PRD item: added photo upload/list/delete service+handler with multipart parsing, SHA-256 verification, storage under storage base path, audit logs, and file_url/thumbnail_url responses (thumbnail_url mirrors file_url). make test failed: missing github.com/jackc/pgconn module.
+
+Completed structured logging PRD item: created pkg/slogctx package for context-aware structured logging. Updated Logging middleware to attach request-scoped logger with request_id, and include user_id/company_id in http_request logs. Added key event logging: ticket_created/updated/submitted/approved/rejected/locked in TicketService, user_login/registered/logout in AuthService, photo_uploaded in PhotoService. All logs inherit request_id from context. make build and make test pass.

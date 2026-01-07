@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ajejoseph22/siteproof/internal/domain"
+	"github.com/ajejoseph22/siteproof/pkg/slogctx"
 )
 
 // PhotoService handles photo operations.
@@ -103,6 +105,14 @@ func (s *PhotoService) Create(ctx context.Context, companyID, ticketID, actorID 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit photo create: %w", err)
 	}
+
+	slogctx.Info(ctx, "photo_uploaded",
+		slog.String("photo_id", photo.ID.String()),
+		slog.String("ticket_id", ticketID.String()),
+		slog.String("uploaded_by_id", actorID.String()),
+		slog.String("file_hash", photo.FileHash),
+		slog.Int("file_size", photo.FileSize),
+	)
 
 	return photo, nil
 }

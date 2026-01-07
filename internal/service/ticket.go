@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ajejoseph22/siteproof/internal/domain"
+	"github.com/ajejoseph22/siteproof/pkg/slogctx"
 )
 
 // TicketService handles ticket operations.
@@ -104,6 +106,15 @@ func (s *TicketService) Create(ctx context.Context, input *domain.CreateTicketIn
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit ticket create: %w", err)
 	}
+
+	slogctx.Info(ctx, "ticket_created",
+		slog.String("ticket_id", ticket.ID.String()),
+		slog.String("ticket_number", ticket.TicketNumber),
+		slog.String("company_id", ticket.CompanyID.String()),
+		slog.String("project_id", ticket.ProjectID.String()),
+		slog.String("created_by_id", input.CreatedByID.String()),
+		slog.String("ticket_type", string(ticket.TicketType)),
+	)
 
 	return &ticket, nil
 }
@@ -287,6 +298,13 @@ func (s *TicketService) Update(ctx context.Context, companyID, id, actorID uuid.
 		return nil, fmt.Errorf("commit ticket update: %w", err)
 	}
 
+	slogctx.Info(ctx, "ticket_updated",
+		slog.String("ticket_id", updated.ID.String()),
+		slog.String("ticket_number", updated.TicketNumber),
+		slog.String("company_id", updated.CompanyID.String()),
+		slog.String("actor_id", actorID.String()),
+	)
+
 	return &updated, nil
 }
 
@@ -339,6 +357,14 @@ func (s *TicketService) SubmitForReview(ctx context.Context, companyID, id, acto
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit ticket submit: %w", err)
 	}
+
+	slogctx.Info(ctx, "ticket_submitted",
+		slog.String("ticket_id", updated.ID.String()),
+		slog.String("ticket_number", updated.TicketNumber),
+		slog.String("company_id", updated.CompanyID.String()),
+		slog.String("actor_id", actorID.String()),
+		slog.String("status", string(updated.Status)),
+	)
 
 	return &updated, nil
 }
@@ -399,6 +425,14 @@ func (s *TicketService) Approve(ctx context.Context, companyID, id, signerID uui
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit ticket approve: %w", err)
 	}
+
+	slogctx.Info(ctx, "ticket_approved",
+		slog.String("ticket_id", updated.ID.String()),
+		slog.String("ticket_number", updated.TicketNumber),
+		slog.String("company_id", updated.CompanyID.String()),
+		slog.String("signer_id", signerID.String()),
+		slog.String("status", string(updated.Status)),
+	)
 
 	return &updated, nil
 }
@@ -466,6 +500,14 @@ func (s *TicketService) Reject(ctx context.Context, companyID, id, rejectorID uu
 		return nil, fmt.Errorf("commit ticket reject: %w", err)
 	}
 
+	slogctx.Info(ctx, "ticket_rejected",
+		slog.String("ticket_id", updated.ID.String()),
+		slog.String("ticket_number", updated.TicketNumber),
+		slog.String("company_id", updated.CompanyID.String()),
+		slog.String("rejector_id", rejectorID.String()),
+		slog.String("status", string(updated.Status)),
+	)
+
 	return &updated, nil
 }
 
@@ -530,6 +572,15 @@ func (s *TicketService) Lock(ctx context.Context, companyID, id uuid.UUID, pdfPa
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit ticket lock: %w", err)
 	}
+
+	slogctx.Info(ctx, "ticket_locked",
+		slog.String("ticket_id", updated.ID.String()),
+		slog.String("ticket_number", updated.TicketNumber),
+		slog.String("company_id", updated.CompanyID.String()),
+		slog.String("status", string(updated.Status)),
+		slog.String("pdf_path", pdfPath),
+		slog.String("content_hash", contentHash),
+	)
 
 	return &updated, nil
 }

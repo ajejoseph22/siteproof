@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/ajejoseph22/siteproof/internal/config"
 	"github.com/ajejoseph22/siteproof/internal/domain"
 	"github.com/ajejoseph22/siteproof/pkg/crypto"
+	"github.com/ajejoseph22/siteproof/pkg/slogctx"
 )
 
 // AuthService handles authentication operations.
@@ -83,6 +85,13 @@ func (s *AuthService) Login(ctx context.Context, input *domain.LoginInput) (*Tok
 	if err != nil {
 		return nil, nil, err
 	}
+
+	slogctx.Info(ctx, "user_login",
+		slog.String("user_id", user.ID.String()),
+		slog.String("company_id", user.CompanyID.String()),
+		slog.String("email", user.Email),
+		slog.String("role", string(user.Role)),
+	)
 
 	return tokens, &user, nil
 }
@@ -174,6 +183,13 @@ func (s *AuthService) Register(ctx context.Context, input *domain.RegisterInput)
 		return nil, nil, err
 	}
 
+	slogctx.Info(ctx, "user_registered",
+		slog.String("user_id", user.ID.String()),
+		slog.String("company_id", company.ID.String()),
+		slog.String("company_name", company.Name),
+		slog.String("email", user.Email),
+	)
+
 	return tokens, &user, nil
 }
 
@@ -238,6 +254,11 @@ func (s *AuthService) Logout(ctx context.Context, userID uuid.UUID) error {
 		UPDATE refresh_tokens SET revoked_at = now()
 		WHERE user_id = $1 AND revoked_at IS NULL
 	`, userID)
+	if err == nil {
+		slogctx.Info(ctx, "user_logout",
+			slog.String("user_id", userID.String()),
+		)
+	}
 	return err
 }
 
