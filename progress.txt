@@ -4,3 +4,4 @@ Completed data layer PRD items 2-7: Verified all migrations (000002-000014) alre
 
 Completed auth registration: added /auth/register to create company + admin user with bcrypt password hashing, slug generation, and JWT/refresh token issuance.
 Implemented idempotency middleware with cached POST responses and X-Idempotent-Replayed; wired it to POST /api/v1/tickets and exposed replay header in CORS.
+Completed RBAC + company scoping: added permission map + RequirePermission middleware, routed RBAC by endpoint, scoped project/ticket queries by company (including project ownership check), and added cross-company handler tests. make test failed due to Go build cache permission limits.
