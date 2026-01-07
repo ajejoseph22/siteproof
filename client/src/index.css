@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -5,9 +6,6 @@
    SITEPROOF - Industrial Construction Design System
    Built with shadcn/ui + Custom Construction Brand
    ═══════════════════════════════════════════════════════════════════════════ */
-
-/* Google Fonts - Industrial Typography */
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Tailwind v4 Theme Extensions
