@@ -7,3 +7,4 @@ Implemented idempotency middleware with cached POST responses and X-Idempotent-R
 Completed RBAC + company scoping: added permission map + RequirePermission middleware, routed RBAC by endpoint, scoped project/ticket queries by company (including project ownership check), and added cross-company handler tests. make test failed due to Go build cache permission limits.
 
 Completed ticket CRUD PRD item: added cursor-based ticket listing (company + project), wired status filter, and audit log entries for ticket lifecycle changes with actor tracking.
+Standardized API error handling: added APIError mapping + WriteErrorFrom, updated handlers to use it, and documented error codes in openapi.yaml. make test failed due to Go build cache permission limits.

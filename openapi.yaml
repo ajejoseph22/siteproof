@@ -31,6 +31,7 @@ info:
       }
     }
     ```
+    See `components/schemas/ErrorCode` for the current list of error codes.
     
     ## Idempotency
     
@@ -1131,6 +1132,26 @@ components:
     # --------------------------------------------------------------------------
     # Common
     # --------------------------------------------------------------------------
+    ErrorCode:
+      type: string
+      description: Machine-readable error code
+      enum:
+        - INVALID_JSON
+        - VALIDATION_ERROR
+        - NOT_FOUND
+        - UNAUTHORIZED
+        - FORBIDDEN
+        - CONFLICT
+        - INVALID_CREDENTIALS
+        - INVALID_TOKEN
+        - TOKEN_EXPIRED
+        - TICKET_LOCKED
+        - INVALID_TRANSITION
+        - NOT_READY
+        - EMAIL_EXISTS
+        - COMPANY_SLUG_EXISTS
+        - INTERNAL_ERROR
+
     ErrorResponse:
       type: object
       required: [error]
@@ -1140,9 +1161,7 @@ components:
           required: [code, message]
           properties:
             code:
-              type: string
-              description: Machine-readable error code
-              example: "VALIDATION_ERROR"
+              $ref: '#/components/schemas/ErrorCode'
             message:
               type: string
               description: Human-readable error message
@@ -1896,4 +1915,3 @@ components:
               type: string
               format: uri
               description: URL to download the locked PDF
-

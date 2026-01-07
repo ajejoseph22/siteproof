@@ -64,11 +64,7 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	project, err := h.projectService.Create(r.Context(), input)
 	if err != nil {
-		if _, ok := err.(domain.ValidationErrors); ok {
-			WriteErrorWithDetails(w, http.StatusBadRequest, "VALIDATION_ERROR", "validation failed", err)
-			return
-		}
-		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to create project")
+		WriteErrorFrom(w, err)
 		return
 	}
 
@@ -92,11 +88,7 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	project, err := h.projectService.GetByID(r.Context(), companyID, id)
 	if err != nil {
-		if err == domain.ErrNotFound {
-			WriteError(w, http.StatusNotFound, "NOT_FOUND", "project not found")
-			return
-		}
-		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to get project")
+		WriteErrorFrom(w, err)
 		return
 	}
 
@@ -123,7 +115,7 @@ func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("status") == "active" {
 		projects, err := h.projectService.ListActiveByCompany(r.Context(), companyID)
 		if err != nil {
-			WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list projects")
+			WriteErrorFrom(w, err)
 			return
 		}
 		WriteJSON(w, http.StatusOK, projects)
@@ -132,7 +124,7 @@ func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	projects, err := h.projectService.ListByCompany(r.Context(), companyID, limit, offset)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list projects")
+		WriteErrorFrom(w, err)
 		return
 	}
 
@@ -189,11 +181,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	project, err := h.projectService.Update(r.Context(), companyID, id, input)
 	if err != nil {
-		if err == domain.ErrNotFound {
-			WriteError(w, http.StatusNotFound, "NOT_FOUND", "project not found")
-			return
-		}
-		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to update project")
+		WriteErrorFrom(w, err)
 		return
 	}
 

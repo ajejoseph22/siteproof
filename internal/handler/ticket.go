@@ -87,15 +87,7 @@ func (h *TicketHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	ticket, err := h.ticketService.Create(r.Context(), input)
 	if err != nil {
-		if _, ok := err.(domain.ValidationErrors); ok {
-			WriteErrorWithDetails(w, http.StatusBadRequest, "VALIDATION_ERROR", "validation failed", err)
-			return
-		}
-		if err == domain.ErrNotFound {
-			WriteError(w, http.StatusNotFound, "NOT_FOUND", "project not found")
-			return
-		}
-		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to create ticket")
+		WriteErrorFrom(w, err)
 		return
 	}
 
@@ -119,11 +111,7 @@ func (h *TicketHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	ticket, err := h.ticketService.GetByID(r.Context(), companyID, id)
 	if err != nil {
-		if err == domain.ErrNotFound {
-			WriteError(w, http.StatusNotFound, "NOT_FOUND", "ticket not found")
-			return
-		}
-		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to get ticket")
+		WriteErrorFrom(w, err)
 		return
 	}
 
@@ -164,7 +152,7 @@ func (h *TicketHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	tickets, err := h.ticketService.ListByCompany(r.Context(), companyID, status, limit, cursor)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list tickets")
+		WriteErrorFrom(w, err)
 		return
 	}
 
@@ -196,7 +184,7 @@ func (h *TicketHandler) ListByProject(w http.ResponseWriter, r *http.Request) {
 
 	tickets, err := h.ticketService.ListByProject(r.Context(), companyID, projectID, limit, cursor)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list tickets")
+		WriteErrorFrom(w, err)
 		return
 	}
 
@@ -253,14 +241,7 @@ func (h *TicketHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	ticket, err := h.ticketService.Update(r.Context(), companyID, id, userID, input)
 	if err != nil {
-		switch err {
-		case domain.ErrNotFound:
-			WriteError(w, http.StatusNotFound, "NOT_FOUND", "ticket not found")
-		case domain.ErrTicketLocked:
-			WriteError(w, http.StatusUnprocessableEntity, "TICKET_LOCKED", "ticket is locked and cannot be modified")
-		default:
-			WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to update ticket")
-		}
+		WriteErrorFrom(w, err)
 		return
 	}
 
@@ -290,14 +271,7 @@ func (h *TicketHandler) Submit(w http.ResponseWriter, r *http.Request) {
 
 	ticket, err := h.ticketService.SubmitForReview(r.Context(), companyID, id, userID)
 	if err != nil {
-		switch err {
-		case domain.ErrNotFound:
-			WriteError(w, http.StatusNotFound, "NOT_FOUND", "ticket not found")
-		case domain.ErrInvalidTransition:
-			WriteError(w, http.StatusUnprocessableEntity, "INVALID_TRANSITION", "cannot submit ticket in current status")
-		default:
-			WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to submit ticket")
-		}
+		WriteErrorFrom(w, err)
 		return
 	}
 
@@ -337,18 +311,7 @@ func (h *TicketHandler) Reject(w http.ResponseWriter, r *http.Request) {
 
 	ticket, err := h.ticketService.Reject(r.Context(), companyID, id, userID, req.Reason)
 	if err != nil {
-		switch err {
-		case domain.ErrNotFound:
-			WriteError(w, http.StatusNotFound, "NOT_FOUND", "ticket not found")
-		case domain.ErrInvalidTransition:
-			WriteError(w, http.StatusUnprocessableEntity, "INVALID_TRANSITION", "cannot reject ticket in current status")
-		default:
-			if ve, ok := err.(*domain.ValidationError); ok {
-				WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", ve.Message)
-			} else {
-				WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to reject ticket")
-			}
-		}
+		WriteErrorFrom(w, err)
 		return
 	}
 

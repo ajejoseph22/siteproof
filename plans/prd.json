@@ -167,7 +167,12 @@
       "Ensure handlers return the consistent error envelope",
       "Document error codes in openapi.yaml"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Added shared APIError mapping for domain and database errors, including validation details and standardized codes.",
+      "Handlers now use WriteErrorFrom for service errors while keeping consistent response envelopes.",
+      "Documented known error codes in openapi.yaml (ErrorCode schema); extend as new codes are introduced."
+    ]
   },
   {
     "category": "backend",

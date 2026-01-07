@@ -58,16 +58,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	tokens, user, err := h.authService.Register(r.Context(), input)
 	if err != nil {
-		var domainErr *domain.DomainError
-		if errors.As(err, &domainErr) && errors.Is(domainErr.Err, domain.ErrConflict) {
-			WriteError(w, http.StatusConflict, domainErr.Code, domainErr.Message)
-			return
-		}
-		if _, ok := err.(domain.ValidationErrors); ok {
-			WriteErrorWithDetails(w, http.StatusBadRequest, "VALIDATION_ERROR", "validation failed", err)
-			return
-		}
-		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "registration failed")
+		WriteErrorFrom(w, err)
 		return
 	}
 
@@ -92,15 +83,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	tokens, user, err := h.authService.Login(r.Context(), input)
 	if err != nil {
-		switch err {
-		case domain.ErrUnauthorized:
+		if errors.Is(err, domain.ErrUnauthorized) {
 			WriteError(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "invalid email or password")
-		default:
-			if _, ok := err.(domain.ValidationErrors); ok {
-				WriteErrorWithDetails(w, http.StatusBadRequest, "VALIDATION_ERROR", "validation failed", err)
-			} else {
-				WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "login failed")
-			}
+		} else {
+			WriteErrorFrom(w, err)
 		}
 		return
 	}
@@ -131,14 +117,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	tokens, err := h.authService.RefreshTokens(r.Context(), req.RefreshToken)
 	if err != nil {
-		switch err {
-		case domain.ErrInvalidToken:
-			WriteError(w, http.StatusUnauthorized, "INVALID_TOKEN", "invalid refresh token")
-		case domain.ErrExpiredToken:
-			WriteError(w, http.StatusUnauthorized, "TOKEN_EXPIRED", "refresh token has expired")
-		default:
-			WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "token refresh failed")
-		}
+		WriteErrorFrom(w, err)
 		return
 	}
 
@@ -154,7 +133,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.authService.Logout(r.Context(), userID); err != nil {
-		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "logout failed")
+		WriteErrorFrom(w, err)
 		return
 	}
 
