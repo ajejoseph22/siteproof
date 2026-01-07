@@ -151,7 +151,12 @@
       "Ensure queries always filter by company_id",
       "Add tests for cross-company access denial"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Added central permission map and RequirePermission middleware, wired per-route RBAC in the API router.",
+      "Scoped project and ticket service queries by company_id and validated project ownership on ticket creation.",
+      "Added handler tests to ensure cross-company access returns 404 for project and ticket reads."
+    ]
   },
   {
     "category": "backend",

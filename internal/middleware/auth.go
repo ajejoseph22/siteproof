@@ -104,3 +104,11 @@ func RoleFromContext(ctx context.Context) (domain.Role, bool) {
 	role, ok := ctx.Value(roleKey).(domain.Role)
 	return role, ok
 }
+
+// WithUserContext attaches user identity information to a context.
+func WithUserContext(ctx context.Context, userID, companyID uuid.UUID, role domain.Role) context.Context {
+	ctx = context.WithValue(ctx, userIDKey, userID)
+	ctx = context.WithValue(ctx, companyIDKey, companyID)
+	ctx = context.WithValue(ctx, roleKey, role)
+	return ctx
+}

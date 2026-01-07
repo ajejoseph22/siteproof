@@ -45,13 +45,13 @@ func (s *ProjectService) Create(ctx context.Context, input *domain.CreateProject
 }
 
 // GetByID retrieves a project by ID.
-func (s *ProjectService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Project, error) {
+func (s *ProjectService) GetByID(ctx context.Context, companyID, id uuid.UUID) (*domain.Project, error) {
 	var project domain.Project
 	err := s.pool.QueryRow(ctx, `
 		SELECT id, company_id, name, address, gc_company_name, gc_contact_email,
 		       status, timezone, settings, created_at, updated_at
-		FROM projects WHERE id = $1
-	`, id).Scan(
+		FROM projects WHERE id = $1 AND company_id = $2
+	`, id, companyID).Scan(
 		&project.ID, &project.CompanyID, &project.Name, &project.Address,
 		&project.GCCompanyName, &project.GCContactEmail, &project.Status,
 		&project.Timezone, &project.Settings, &project.CreatedAt, &project.UpdatedAt,
@@ -130,7 +130,7 @@ func (s *ProjectService) ListActiveByCompany(ctx context.Context, companyID uuid
 }
 
 // Update updates a project.
-func (s *ProjectService) Update(ctx context.Context, id uuid.UUID, input *domain.UpdateProjectInput) (*domain.Project, error) {
+func (s *ProjectService) Update(ctx context.Context, companyID, id uuid.UUID, input *domain.UpdateProjectInput) (*domain.Project, error) {
 	var project domain.Project
 	err := s.pool.QueryRow(ctx, `
 		UPDATE projects
@@ -141,11 +141,11 @@ func (s *ProjectService) Update(ctx context.Context, id uuid.UUID, input *domain
 		    status = COALESCE($6, status),
 		    timezone = COALESCE($7, timezone),
 		    updated_at = now()
-		WHERE id = $1
+		WHERE id = $1 AND company_id = $8
 		RETURNING id, company_id, name, address, gc_company_name, gc_contact_email,
 		          status, timezone, settings, created_at, updated_at
 	`, id, input.Name, input.Address, input.GCCompanyName, input.GCContactEmail,
-		input.Status, input.Timezone).Scan(
+		input.Status, input.Timezone, companyID).Scan(
 		&project.ID, &project.CompanyID, &project.Name, &project.Address,
 		&project.GCCompanyName, &project.GCContactEmail, &project.Status,
 		&project.Timezone, &project.Settings, &project.CreatedAt, &project.UpdatedAt,

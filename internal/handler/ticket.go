@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,16 +11,25 @@ import (
 
 	"github.com/ajejoseph22/siteproof/internal/domain"
 	"github.com/ajejoseph22/siteproof/internal/middleware"
-	"github.com/ajejoseph22/siteproof/internal/service"
 )
+
+// TicketService defines ticket operations needed by the handler.
+type TicketService interface {
+	Create(ctx context.Context, input *domain.CreateTicketInput) (*domain.Ticket, error)
+	GetByID(ctx context.Context, companyID, id uuid.UUID) (*domain.Ticket, error)
+	ListByProject(ctx context.Context, companyID, projectID uuid.UUID, limit, offset int) ([]*domain.Ticket, error)
+	Update(ctx context.Context, companyID, id uuid.UUID, input *domain.UpdateTicketInput) (*domain.Ticket, error)
+	SubmitForReview(ctx context.Context, companyID, id uuid.UUID) (*domain.Ticket, error)
+	Reject(ctx context.Context, companyID, id, rejectorID uuid.UUID, reason string) (*domain.Ticket, error)
+}
 
 // TicketHandler handles ticket endpoints.
 type TicketHandler struct {
-	ticketService *service.TicketService
+	ticketService TicketService
 }
 
 // NewTicketHandler creates a new ticket handler.
-func NewTicketHandler(ticketService *service.TicketService) *TicketHandler {
+func NewTicketHandler(ticketService TicketService) *TicketHandler {
 	return &TicketHandler{ticketService: ticketService}
 }
 
@@ -39,7 +49,11 @@ func (h *TicketHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	companyID, _ := middleware.CompanyIDFromContext(r.Context())
+	companyID, ok := middleware.CompanyIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "not authenticated")
+		return
+	}
 
 	var req CreateTicketRequest
 	if err := DecodeJSON(r, &req); err != nil {
@@ -74,6 +88,10 @@ func (h *TicketHandler) Create(w http.ResponseWriter, r *http.Request) {
 			WriteErrorWithDetails(w, http.StatusBadRequest, "VALIDATION_ERROR", "validation failed", err)
 			return
 		}
+		if err == domain.ErrNotFound {
+			WriteError(w, http.StatusNotFound, "NOT_FOUND", "project not found")
+			return
+		}
 		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to create ticket")
 		return
 	}
@@ -90,9 +108,13 @@ func (h *TicketHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	companyID, _ := middleware.CompanyIDFromContext(r.Context())
+	companyID, ok := middleware.CompanyIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "not authenticated")
+		return
+	}
 
-	ticket, err := h.ticketService.GetByID(r.Context(), id)
+	ticket, err := h.ticketService.GetByID(r.Context(), companyID, id)
 	if err != nil {
 		if err == domain.ErrNotFound {
 			WriteError(w, http.StatusNotFound, "NOT_FOUND", "ticket not found")
@@ -120,9 +142,15 @@ func (h *TicketHandler) ListByProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	companyID, ok := middleware.CompanyIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "not authenticated")
+		return
+	}
+
 	limit, offset := parsePagination(r)
 
-	tickets, err := h.ticketService.ListByProject(r.Context(), projectID, limit, offset)
+	tickets, err := h.ticketService.ListByProject(r.Context(), companyID, projectID, limit, offset)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list tickets")
 		return
@@ -147,6 +175,12 @@ func (h *TicketHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	companyID, ok := middleware.CompanyIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "not authenticated")
+		return
+	}
+
 	var req UpdateTicketRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		WriteError(w, http.StatusBadRequest, "INVALID_JSON", "invalid request body")
@@ -167,7 +201,7 @@ func (h *TicketHandler) Update(w http.ResponseWriter, r *http.Request) {
 		input.WorkDate = &workDate
 	}
 
-	ticket, err := h.ticketService.Update(r.Context(), id, input)
+	ticket, err := h.ticketService.Update(r.Context(), companyID, id, input)
 	if err != nil {
 		switch err {
 		case domain.ErrNotFound:
@@ -192,7 +226,13 @@ func (h *TicketHandler) Submit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ticket, err := h.ticketService.SubmitForReview(r.Context(), id)
+	companyID, ok := middleware.CompanyIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "not authenticated")
+		return
+	}
+
+	ticket, err := h.ticketService.SubmitForReview(r.Context(), companyID, id)
 	if err != nil {
 		switch err {
 		case domain.ErrNotFound:
@@ -222,7 +262,16 @@ func (h *TicketHandler) Reject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, _ := middleware.UserIDFromContext(r.Context())
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "not authenticated")
+		return
+	}
+	companyID, ok := middleware.CompanyIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "not authenticated")
+		return
+	}
 
 	var req RejectRequest
 	if err := DecodeJSON(r, &req); err != nil {
@@ -230,7 +279,7 @@ func (h *TicketHandler) Reject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ticket, err := h.ticketService.Reject(r.Context(), id, userID, req.Reason)
+	ticket, err := h.ticketService.Reject(r.Context(), companyID, id, userID, req.Reason)
 	if err != nil {
 		switch err {
 		case domain.ErrNotFound:

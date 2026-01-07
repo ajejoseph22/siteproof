@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -8,16 +9,24 @@ import (
 
 	"github.com/ajejoseph22/siteproof/internal/domain"
 	"github.com/ajejoseph22/siteproof/internal/middleware"
-	"github.com/ajejoseph22/siteproof/internal/service"
 )
+
+// ProjectService defines project operations needed by the handler.
+type ProjectService interface {
+	Create(ctx context.Context, input *domain.CreateProjectInput) (*domain.Project, error)
+	GetByID(ctx context.Context, companyID, id uuid.UUID) (*domain.Project, error)
+	ListByCompany(ctx context.Context, companyID uuid.UUID, limit, offset int) ([]*domain.Project, error)
+	ListActiveByCompany(ctx context.Context, companyID uuid.UUID) ([]*domain.Project, error)
+	Update(ctx context.Context, companyID, id uuid.UUID, input *domain.UpdateProjectInput) (*domain.Project, error)
+}
 
 // ProjectHandler handles project endpoints.
 type ProjectHandler struct {
-	projectService *service.ProjectService
+	projectService ProjectService
 }
 
 // NewProjectHandler creates a new project handler.
-func NewProjectHandler(projectService *service.ProjectService) *ProjectHandler {
+func NewProjectHandler(projectService ProjectService) *ProjectHandler {
 	return &ProjectHandler{projectService: projectService}
 }
 
@@ -75,9 +84,13 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	companyID, _ := middleware.CompanyIDFromContext(r.Context())
+	companyID, ok := middleware.CompanyIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "not authenticated")
+		return
+	}
 
-	project, err := h.projectService.GetByID(r.Context(), id)
+	project, err := h.projectService.GetByID(r.Context(), companyID, id)
 	if err != nil {
 		if err == domain.ErrNotFound {
 			WriteError(w, http.StatusNotFound, "NOT_FOUND", "project not found")
@@ -145,6 +158,12 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	companyID, ok := middleware.CompanyIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "not authenticated")
+		return
+	}
+
 	var req UpdateProjectRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		WriteError(w, http.StatusBadRequest, "INVALID_JSON", "invalid request body")
@@ -168,7 +187,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		input.Status = &status
 	}
 
-	project, err := h.projectService.Update(r.Context(), id, input)
+	project, err := h.projectService.Update(r.Context(), companyID, id, input)
 	if err != nil {
 		if err == domain.ErrNotFound {
 			WriteError(w, http.StatusNotFound, "NOT_FOUND", "project not found")

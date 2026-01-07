@@ -28,9 +28,20 @@ func (s *TicketService) Create(ctx context.Context, input *domain.CreateTicketIn
 		return nil, err
 	}
 
+	var projectExists bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM projects WHERE id = $1 AND company_id = $2)
+	`, input.ProjectID, input.CompanyID).Scan(&projectExists)
+	if err != nil {
+		return nil, fmt.Errorf("check project: %w", err)
+	}
+	if !projectExists {
+		return nil, domain.ErrNotFound
+	}
+
 	// Get next ticket number
 	var nextNumber int
-	err := s.pool.QueryRow(ctx, `
+	err = s.pool.QueryRow(ctx, `
 		SELECT COALESCE(MAX(CAST(SUBSTRING(ticket_number FROM '[0-9]+$') AS INTEGER)), 0) + 1
 		FROM tickets WHERE company_id = $1
 	`, input.CompanyID).Scan(&nextNumber)
@@ -71,7 +82,7 @@ func (s *TicketService) Create(ctx context.Context, input *domain.CreateTicketIn
 }
 
 // GetByID retrieves a ticket by ID.
-func (s *TicketService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Ticket, error) {
+func (s *TicketService) GetByID(ctx context.Context, companyID, id uuid.UUID) (*domain.Ticket, error) {
 	var ticket domain.Ticket
 	err := s.pool.QueryRow(ctx, `
 		SELECT id, company_id, project_id, created_by_id, ticket_number, ticket_type,
@@ -80,8 +91,8 @@ func (s *TicketService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Tick
 		       rejected_at, rejected_by_id, rejection_reason,
 		       pdf_generated_at, pdf_path, pdf_hash, locked_at, content_hash,
 		       created_at, updated_at
-		FROM tickets WHERE id = $1
-	`, id).Scan(
+		FROM tickets WHERE id = $1 AND company_id = $2
+	`, id, companyID).Scan(
 		&ticket.ID, &ticket.CompanyID, &ticket.ProjectID, &ticket.CreatedByID,
 		&ticket.TicketNumber, &ticket.TicketType, &ticket.Title,
 		&ticket.DescriptionRaw, &ticket.DescriptionCleaned, &ticket.DescriptionFinal,
@@ -101,15 +112,15 @@ func (s *TicketService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Tick
 }
 
 // ListByProject retrieves tickets for a project.
-func (s *TicketService) ListByProject(ctx context.Context, projectID uuid.UUID, limit, offset int) ([]*domain.Ticket, error) {
+func (s *TicketService) ListByProject(ctx context.Context, companyID, projectID uuid.UUID, limit, offset int) ([]*domain.Ticket, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, company_id, project_id, created_by_id, ticket_number, ticket_type,
 		       title, work_date, status, created_at, updated_at
 		FROM tickets
-		WHERE project_id = $1
+		WHERE project_id = $1 AND company_id = $2
 		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3
-	`, projectID, limit, offset)
+		LIMIT $3 OFFSET $4
+	`, projectID, companyID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list tickets: %w", err)
 	}
@@ -132,9 +143,9 @@ func (s *TicketService) ListByProject(ctx context.Context, projectID uuid.UUID, 
 }
 
 // Update updates a ticket (only drafts can be updated).
-func (s *TicketService) Update(ctx context.Context, id uuid.UUID, input *domain.UpdateTicketInput) (*domain.Ticket, error) {
+func (s *TicketService) Update(ctx context.Context, companyID, id uuid.UUID, input *domain.UpdateTicketInput) (*domain.Ticket, error) {
 	// First check if ticket is editable
-	ticket, err := s.GetByID(ctx, id)
+	ticket, err := s.GetByID(ctx, companyID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -146,15 +157,15 @@ func (s *TicketService) Update(ctx context.Context, id uuid.UUID, input *domain.
 	var updated domain.Ticket
 	err = s.pool.QueryRow(ctx, `
 		UPDATE tickets
-		SET title = COALESCE($2, title),
-		    description_final = COALESCE($3, description_final),
-		    work_date = COALESCE($4, work_date),
+		SET title = COALESCE($3, title),
+		    description_final = COALESCE($4, description_final),
+		    work_date = COALESCE($5, work_date),
 		    updated_at = now()
-		WHERE id = $1 AND status = 'draft'
+		WHERE id = $1 AND company_id = $2 AND status = 'draft'
 		RETURNING id, company_id, project_id, created_by_id, ticket_number, ticket_type,
 		          title, description_raw, description_cleaned, description_final,
 		          work_date, status, created_at, updated_at
-	`, id, input.Title, input.DescriptionFinal, input.WorkDate).Scan(
+	`, id, companyID, input.Title, input.DescriptionFinal, input.WorkDate).Scan(
 		&updated.ID, &updated.CompanyID, &updated.ProjectID, &updated.CreatedByID,
 		&updated.TicketNumber, &updated.TicketType, &updated.Title,
 		&updated.DescriptionRaw, &updated.DescriptionCleaned, &updated.DescriptionFinal,
@@ -168,8 +179,8 @@ func (s *TicketService) Update(ctx context.Context, id uuid.UUID, input *domain.
 }
 
 // SubmitForReview changes ticket status to pending_review.
-func (s *TicketService) SubmitForReview(ctx context.Context, id uuid.UUID) (*domain.Ticket, error) {
-	ticket, err := s.GetByID(ctx, id)
+func (s *TicketService) SubmitForReview(ctx context.Context, companyID, id uuid.UUID) (*domain.Ticket, error) {
+	ticket, err := s.GetByID(ctx, companyID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -182,10 +193,10 @@ func (s *TicketService) SubmitForReview(ctx context.Context, id uuid.UUID) (*dom
 	err = s.pool.QueryRow(ctx, `
 		UPDATE tickets
 		SET status = 'pending_review', updated_at = now()
-		WHERE id = $1
+		WHERE id = $1 AND company_id = $2
 		RETURNING id, company_id, project_id, created_by_id, ticket_number, ticket_type,
 		          title, work_date, status, created_at, updated_at
-	`, id).Scan(
+	`, id, companyID).Scan(
 		&updated.ID, &updated.CompanyID, &updated.ProjectID, &updated.CreatedByID,
 		&updated.TicketNumber, &updated.TicketType, &updated.Title,
 		&updated.WorkDate, &updated.Status, &updated.CreatedAt, &updated.UpdatedAt,
@@ -198,8 +209,8 @@ func (s *TicketService) SubmitForReview(ctx context.Context, id uuid.UUID) (*dom
 }
 
 // Approve approves a ticket.
-func (s *TicketService) Approve(ctx context.Context, id, signerID uuid.UUID) (*domain.Ticket, error) {
-	ticket, err := s.GetByID(ctx, id)
+func (s *TicketService) Approve(ctx context.Context, companyID, id, signerID uuid.UUID) (*domain.Ticket, error) {
+	ticket, err := s.GetByID(ctx, companyID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -215,11 +226,11 @@ func (s *TicketService) Approve(ctx context.Context, id, signerID uuid.UUID) (*d
 		    gc_signed_at = now(),
 		    gc_signed_by_id = $2,
 		    updated_at = now()
-		WHERE id = $1
+		WHERE id = $1 AND company_id = $3
 		RETURNING id, company_id, project_id, created_by_id, ticket_number, ticket_type,
 		          title, work_date, status, gc_signed_at, gc_signed_by_id,
 		          created_at, updated_at
-	`, id, signerID).Scan(
+	`, id, signerID, companyID).Scan(
 		&updated.ID, &updated.CompanyID, &updated.ProjectID, &updated.CreatedByID,
 		&updated.TicketNumber, &updated.TicketType, &updated.Title,
 		&updated.WorkDate, &updated.Status, &updated.GCSignedAt, &updated.GCSignedByID,
@@ -233,8 +244,8 @@ func (s *TicketService) Approve(ctx context.Context, id, signerID uuid.UUID) (*d
 }
 
 // Reject rejects a ticket.
-func (s *TicketService) Reject(ctx context.Context, id, rejectorID uuid.UUID, reason string) (*domain.Ticket, error) {
-	ticket, err := s.GetByID(ctx, id)
+func (s *TicketService) Reject(ctx context.Context, companyID, id, rejectorID uuid.UUID, reason string) (*domain.Ticket, error) {
+	ticket, err := s.GetByID(ctx, companyID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -255,11 +266,11 @@ func (s *TicketService) Reject(ctx context.Context, id, rejectorID uuid.UUID, re
 		    rejected_by_id = $2,
 		    rejection_reason = $3,
 		    updated_at = now()
-		WHERE id = $1
+		WHERE id = $1 AND company_id = $4
 		RETURNING id, company_id, project_id, created_by_id, ticket_number, ticket_type,
 		          title, work_date, status, rejected_at, rejected_by_id, rejection_reason,
 		          created_at, updated_at
-	`, id, rejectorID, reason).Scan(
+	`, id, rejectorID, reason, companyID).Scan(
 		&updated.ID, &updated.CompanyID, &updated.ProjectID, &updated.CreatedByID,
 		&updated.TicketNumber, &updated.TicketType, &updated.Title,
 		&updated.WorkDate, &updated.Status, &updated.RejectedAt, &updated.RejectedByID,
@@ -273,8 +284,8 @@ func (s *TicketService) Reject(ctx context.Context, id, rejectorID uuid.UUID, re
 }
 
 // Lock locks a ticket with PDF information.
-func (s *TicketService) Lock(ctx context.Context, id uuid.UUID, pdfPath, pdfHash, contentHash string) (*domain.Ticket, error) {
-	ticket, err := s.GetByID(ctx, id)
+func (s *TicketService) Lock(ctx context.Context, companyID, id uuid.UUID, pdfPath, pdfHash, contentHash string) (*domain.Ticket, error) {
+	ticket, err := s.GetByID(ctx, companyID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -293,11 +304,11 @@ func (s *TicketService) Lock(ctx context.Context, id uuid.UUID, pdfPath, pdfHash
 		    pdf_hash = $3,
 		    content_hash = $4,
 		    updated_at = now()
-		WHERE id = $1
+		WHERE id = $1 AND company_id = $5
 		RETURNING id, company_id, project_id, created_by_id, ticket_number, ticket_type,
 		          title, work_date, status, locked_at, pdf_path, pdf_hash, content_hash,
 		          created_at, updated_at
-	`, id, pdfPath, pdfHash, contentHash).Scan(
+	`, id, pdfPath, pdfHash, contentHash, companyID).Scan(
 		&updated.ID, &updated.CompanyID, &updated.ProjectID, &updated.CreatedByID,
 		&updated.TicketNumber, &updated.TicketType, &updated.Title,
 		&updated.WorkDate, &updated.Status, &updated.LockedAt, &updated.PDFPath,

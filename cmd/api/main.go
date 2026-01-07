@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ajejoseph22/siteproof/internal/config"
+	"github.com/ajejoseph22/siteproof/internal/domain"
 	"github.com/ajejoseph22/siteproof/internal/handler"
 	"github.com/ajejoseph22/siteproof/internal/middleware"
 	"github.com/ajejoseph22/siteproof/internal/repository/db"
@@ -113,20 +114,23 @@ func main() {
 
 			// Projects
 			r.Route("/projects", func(r chi.Router) {
-				r.Get("/", projectHandler.List)
-				r.Post("/", projectHandler.Create)
-				r.Get("/{id}", projectHandler.Get)
-				r.Patch("/{id}", projectHandler.Update)
-				r.Get("/{project_id}/tickets", ticketHandler.ListByProject)
+				r.With(middleware.RequirePermission(domain.PermissionProjectRead)).Get("/", projectHandler.List)
+				r.With(middleware.RequirePermission(domain.PermissionProjectWrite)).Post("/", projectHandler.Create)
+				r.With(middleware.RequirePermission(domain.PermissionProjectRead)).Get("/{id}", projectHandler.Get)
+				r.With(middleware.RequirePermission(domain.PermissionProjectWrite)).Patch("/{id}", projectHandler.Update)
+				r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/{project_id}/tickets", ticketHandler.ListByProject)
 			})
 
 			// Tickets
 			r.Route("/tickets", func(r chi.Router) {
-				r.With(middleware.Idempotency(queries)).Post("/", ticketHandler.Create)
-				r.Get("/{id}", ticketHandler.Get)
-				r.Patch("/{id}", ticketHandler.Update)
-				r.Post("/{id}/submit", ticketHandler.Submit)
-				r.Post("/{id}/reject", ticketHandler.Reject)
+				r.With(
+					middleware.RequirePermission(domain.PermissionTicketWrite),
+					middleware.Idempotency(queries),
+				).Post("/", ticketHandler.Create)
+				r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/{id}", ticketHandler.Get)
+				r.With(middleware.RequirePermission(domain.PermissionTicketWrite)).Patch("/{id}", ticketHandler.Update)
+				r.With(middleware.RequirePermission(domain.PermissionTicketSubmit)).Post("/{id}/submit", ticketHandler.Submit)
+				r.With(middleware.RequirePermission(domain.PermissionTicketReject)).Post("/{id}/reject", ticketHandler.Reject)
 			})
 		})
 	})
