@@ -45,9 +45,6 @@ tmp/
 data/
 uploads/
 
-# Generated files
-internal/repository/db/*.go
-
 # Docker
 docker-compose.override.yml
 /.gocache/

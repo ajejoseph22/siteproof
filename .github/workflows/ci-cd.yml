@@ -31,6 +31,9 @@ jobs:
       - name: SQLC generate
         run: sqlc generate
 
+      - name: SQLC verify generated code is clean
+        run: git diff --exit-code internal/repository/db
+
       - name: Go vet
         run: go vet ./...
 
@@ -41,9 +44,6 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.62.2
-
-      - name: SQLC compile
-        run: sqlc compile
 
       - name: Install Typst
         run: |

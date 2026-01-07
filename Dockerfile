@@ -13,11 +13,6 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Generate sqlc code inside the build to avoid requiring committed outputs
-ARG SQLC_VERSION=1.26.0
-RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@v${SQLC_VERSION}
-RUN /go/bin/sqlc generate
-
 # Build the application
 ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
