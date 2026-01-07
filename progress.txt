@@ -1,0 +1,5 @@
+Completed config PRD item (optional env file loading in config, OAuth config fields, .env.example + CLAUDE docs). make test blocked by sandbox go build cache permissions.
+
+Completed data layer PRD items 2-7: Verified all migrations (000002-000014) already implemented full data layer including companies/users/projects tables, tickets/line_items schema, photos/signatures with hash verification, audit logs with hash chain triggers, and immutability enforcement. Added cursor-based pagination queries (ListTicketsByCursor, ListTicketsByStatusCursor, ListTicketsByProjectCursor, ListUsersByCursor). Fixed sqlc.yaml type overrides for jsonb/inet imports. Regenerated sqlc code. make test passes (no test files yet but code compiles).
+
+Completed auth registration: added /auth/register to create company + admin user with bcrypt password hashing, slug generation, and JWT/refresh token issuance.

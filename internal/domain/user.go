@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -112,6 +113,40 @@ type UpdateUserInput struct {
 	Phone  *string
 	Role   *Role
 	Active *bool
+}
+
+// RegisterInput represents input for registration.
+type RegisterInput struct {
+	CompanyName string
+	Email       string
+	Password    string
+	Name        string
+	Phone       *string
+}
+
+// Validate validates the registration input.
+func (i *RegisterInput) Validate() error {
+	var errs ValidationErrors
+
+	if strings.TrimSpace(i.CompanyName) == "" {
+		errs.Add("company_name", "is required")
+	}
+	if strings.TrimSpace(i.Email) == "" {
+		errs.Add("email", "is required")
+	}
+	if i.Password == "" {
+		errs.Add("password", "is required")
+	} else if len(i.Password) < 8 {
+		errs.Add("password", "must be at least 8 characters")
+	}
+	if strings.TrimSpace(i.Name) == "" {
+		errs.Add("name", "is required")
+	}
+
+	if errs.HasErrors() {
+		return errs
+	}
+	return nil
 }
 
 // LoginInput represents input for user login.

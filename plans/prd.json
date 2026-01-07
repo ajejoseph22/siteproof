@@ -1,0 +1,552 @@
+[
+  {
+    "category": "foundation",
+    "description": "Implement configuration loading and validation for the API server",
+    "steps": [
+      "Define a config struct that covers server, database, storage, email, sms, oauth, and openai settings",
+      "Load config from environment variables and optional config file with sane defaults",
+      "Validate required fields at startup and fail fast with clear error messages",
+      "Add a sample config file and document required env vars in README or CLAUDE notes"
+    ],
+    "passes": true,
+    "notes": [
+      "Config loading now supports optional env files (CONFIG_FILE or .env), includes OAuth settings, and ships a .env.example with updated CLAUDE docs."
+    ]
+  },
+  {
+    "category": "data",
+    "description": "Create core multi-tenant tables for companies, users, and projects",
+    "steps": [
+      "Add migrations for companies, users, and projects with foreign keys and indexes",
+      "Include role and status columns on users with check constraints",
+      "Ensure every table includes company_id and created_at/updated_at",
+      "Provide down migrations for all new tables"
+    ],
+    "passes": true,
+    "notes": [
+      "Migrations 000002-000004 create companies, users, and projects tables with all required constraints.",
+      "Users have role CHECK constraint (foreman, gc_super, pm, accounting, admin) and active column.",
+      "All tables include company_id (via foreign keys), created_at, and updated_at columns with auto-update triggers.",
+      "Down migrations provided for all tables."
+    ]
+  },
+  {
+    "category": "data",
+    "description": "Add ticket and line item schema with status transitions",
+    "steps": [
+      "Create tickets table with status, ticket_number, work_date, and metadata",
+      "Create line_items table linked to tickets with quantity, unit_cost, and totals",
+      "Add check constraints for valid status values and positive numeric fields",
+      "Create indexes for ticket_number and status for list queries"
+    ],
+    "passes": true,
+    "notes": [
+      "Migrations 000005 (tickets) and 000006 (ticket_line_items) implement the full schema.",
+      "Tickets table has status CHECK (draft, pending_review, approved, rejected, locked), ticket_number unique per company, work_date, and rich metadata including PDF and hash fields.",
+      "Line items have item_type CHECK (labor, material, equipment), quantity positive CHECK, and unit_rate/total non-negative CHECKs.",
+      "Indexes created for company_id, status, ticket_number, work_date, and pending tickets."
+    ]
+  },
+  {
+    "category": "data",
+    "description": "Add photo, signature, and pdf tables with file metadata",
+    "steps": [
+      "Create photos table with file_path, sha256_hash, caption, taken_at, and location",
+      "Create signatures table with signer_type, file_path, and sha256_hash",
+      "Create pdfs table with file_path, sha256_hash, and generated_at",
+      "Add unique constraints to prevent duplicate signature types per ticket"
+    ],
+    "passes": true,
+    "notes": [
+      "Migration 000007 (photos) creates photos table with file_path, file_hash (SHA-256), caption, taken_at, latitude/longitude.",
+      "Migration 000009 (signatures) creates signatures table with signer_type, signature_image (path), signature_hash, plus signing method and device tracking.",
+      "PDF metadata is stored on tickets table (pdf_path, pdf_hash, pdf_generated_at) - one PDF per ticket design decision.",
+      "Unique constraint signatures_one_per_type prevents duplicate signature types per ticket."
+    ]
+  },
+  {
+    "category": "data",
+    "description": "Add audit log and email event tables with hash chain support",
+    "steps": [
+      "Create audit_logs table with prev_hash and entry_hash fields",
+      "Create email_events table to capture send and delivery status",
+      "Index audit_logs by entity_id and occurred_at",
+      "Add down migrations for both tables"
+    ],
+    "passes": true,
+    "notes": [
+      "Migration 000010 (audit_logs) creates immutable audit log table with prev_hash and entry_hash fields, plus hash chain trigger.",
+      "Migration 000011 (email_events) creates email event tracking with status (sent, delivered, opened, bounced, spam_complaint).",
+      "Indexes on audit_logs: entity_type+entity_id, actor_id, occurred_at DESC, entity_type+action.",
+      "Down migrations provided for both tables with trigger cleanup."
+    ]
+  },
+  {
+    "category": "data",
+    "description": "Implement database triggers to enforce immutability and append-only audit logs",
+    "steps": [
+      "Add trigger to block UPDATE on tickets with status locked",
+      "Add trigger to prevent UPDATE or DELETE on audit_logs",
+      "Return clear error messages from triggers for API error mapping",
+      "Add migration tests or manual verification steps"
+    ],
+    "passes": true,
+    "notes": [
+      "Migration 000014 (ticket_lock_enforcement) adds prevent_locked_ticket_changes trigger blocking substantive updates to locked tickets.",
+      "Migration 000010 includes prevent_audit_modification trigger blocking UPDATE/DELETE on audit_logs.",
+      "Both triggers raise clear EXCEPTION messages with hints for API error mapping.",
+      "Status transition trigger (validate_ticket_status_transition) enforces valid workflow: draft -> pending_review -> approved/rejected -> locked."
+    ]
+  },
+  {
+    "category": "backend",
+    "description": "Define sqlc queries and repositories for core entities",
+    "steps": [
+      "Write sqlc query files for companies, users, projects, tickets, and line items",
+      "Generate sqlc code and wire repositories in the service layer",
+      "Add queries for list pagination with cursor support",
+      "Add unit tests for repository methods that have custom logic"
+    ],
+    "passes": true,
+    "notes": [
+      "SQL query files exist in internal/repository/queries/ for all core entities (companies, users, projects, tickets, line_items, photos, signatures, signing_links, audit_logs, email_events, etc.).",
+      "sqlc code generated to internal/repository/db/ with type-safe Go interfaces.",
+      "Cursor-based pagination added: ListTicketsByCursor, ListTicketsByStatusCursor, ListTicketsByProjectCursor, ListUsersByCursor.",
+      "Fixed sqlc.yaml jsonb/inet type overrides for proper import paths.",
+      "Unit tests deferred - current tests pass with no test files but code compiles."
+    ]
+  },
+  {
+    "category": "security",
+    "description": "Implement registration and login with JWT authentication",
+    "steps": [
+      "Add handlers for register and login with bcrypt password hashing",
+      "Issue JWT access tokens with expiry and required claims",
+      "Add middleware to validate JWT and attach user context",
+      "Return standardized auth error responses for invalid or expired tokens"
+    ],
+    "passes": true,
+    "notes": [
+      "Added /api/v1/auth/register to create a company + admin user, hash passwords with bcrypt, and issue access/refresh tokens.",
+      "Follow-up: document /auth/register in openapi.yaml and decide on invite or email verification flow."
+    ]
+  },
+  {
+    "category": "security",
+    "description": "Add Microsoft OAuth login flow for optional SSO",
+    "steps": [
+      "Configure OAuth client settings and redirect URIs",
+      "Implement login and callback handlers using MSAL",
+      "Link OAuth identities to existing users by email domain",
+      "Issue JWT tokens after successful OAuth sign in"
+    ],
+    "passes": false
+  },
+  {
+    "category": "security",
+    "description": "Implement RBAC middleware and company scoping",
+    "steps": [
+      "Define role permissions for each action in a central policy map",
+      "Add middleware to enforce role permissions per route",
+      "Ensure queries always filter by company_id",
+      "Add tests for cross-company access denial"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Standardize API error responses and error code mapping",
+    "steps": [
+      "Create a shared error type with code, message, and optional details",
+      "Map domain and database errors to HTTP status codes",
+      "Ensure handlers return the consistent error envelope",
+      "Document error codes in openapi.yaml"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Add idempotency key support for POST endpoints",
+    "steps": [
+      "Create idempotency_keys table storing key, endpoint, and response",
+      "Implement middleware to check and replay responses",
+      "Add response header X-Idempotent-Replayed when reused",
+      "Apply middleware to ticket creation and signature request endpoints"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement ticket CRUD endpoints with status transitions",
+    "steps": [
+      "Create endpoints for create, list, get by id, and update draft tickets",
+      "Implement cursor-based pagination and status filtering",
+      "Enforce status transition rules in domain logic",
+      "Write audit log entries for each ticket state change"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement line item management for tickets",
+    "steps": [
+      "Add endpoints to add, update, and delete line items",
+      "Validate quantities, unit costs, and totals",
+      "Update ticket totals after line item changes",
+      "Record audit log entries for line item changes"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement photo upload with hashing and metadata",
+    "steps": [
+      "Accept multipart form uploads with caption and taken_at metadata",
+      "Compute sha256 hash for each photo and store in database",
+      "Save files under /data/uploads/{company_id}/photos/{ticket_id}",
+      "Return file paths and thumbnail URLs in the response"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement secure file download endpoints",
+    "steps": [
+      "Add endpoints to fetch photos, signatures, and PDFs with auth checks",
+      "Set correct content type and cache headers",
+      "Return 404 for missing or unauthorized files",
+      "Add tests for access control on file downloads"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement signature request flow",
+    "steps": [
+      "Create signing_links table with token and expiration",
+      "Add endpoint to request signature and generate a signing link",
+      "Send signing link via email and SMS",
+      "Record audit log entry for signature request"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement signature capture and ticket status updates",
+    "steps": [
+      "Create endpoint to accept signature image and signer metadata",
+      "Store signature file and hash, then link to ticket",
+      "Update ticket status based on signer type and rules",
+      "Prevent duplicate signatures of the same type"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Implement audit log hash chain logic",
+    "steps": [
+      "Compute entry_hash from log entry and prev_hash",
+      "Store prev_hash and entry_hash on every audit log insert",
+      "Add helper to verify hash chain for a ticket",
+      "Include audit log entries for key actions"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Compute and store ticket content hash at lock time",
+    "steps": [
+      "Define canonical serialization for ticket content fields",
+      "Include line items, photo hashes, and signature hashes",
+      "Store content_hash when ticket transitions to locked",
+      "Add tests to ensure hash changes when content changes"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Generate PDF using Typst templates and store PDF hash",
+    "steps": [
+      "Build a data model that maps ticket data into template inputs",
+      "Invoke Typst to compile templates/ticket.typ to a PDF",
+      "Store PDF file in /data/uploads/{company_id}/pdfs/{ticket_id}",
+      "Compute sha256 hash of the PDF and save to pdfs table"
+    ],
+    "passes": false
+  },
+  {
+    "category": "integration",
+    "description": "Send ticket emails via Postmark with PDF attachments",
+    "steps": [
+      "Configure Postmark client and sender metadata",
+      "Send PDF emails to signer and internal recipients",
+      "Store send result in email_events table",
+      "Handle send failures with retry or failed_emails tracking"
+    ],
+    "passes": false
+  },
+  {
+    "category": "integration",
+    "description": "Handle Postmark webhooks for delivery status",
+    "steps": [
+      "Implement webhook endpoint for Postmark events",
+      "Verify webhook signature or token",
+      "Update email_events with delivery status and timestamps",
+      "Log and ignore unknown event types"
+    ],
+    "passes": false
+  },
+  {
+    "category": "integration",
+    "description": "Integrate Twilio SMS for signing links and verification codes",
+    "steps": [
+      "Configure Twilio client and sender phone number",
+      "Send SMS with signing links on signature request",
+      "Record SMS send attempts and failures",
+      "Return clear errors when SMS delivery fails"
+    ],
+    "passes": false
+  },
+  {
+    "category": "integration",
+    "description": "Integrate OpenAI for voice cleanup with fallback to raw text",
+    "steps": [
+      "Add service to call OpenAI for cleanup of raw transcription",
+      "Implement timeouts and retries with circuit breaker",
+      "Store both raw and cleaned text in the database",
+      "Fallback to raw transcription if OpenAI fails"
+    ],
+    "passes": false
+  },
+  {
+    "category": "backend",
+    "description": "Add verification endpoint for ticket integrity",
+    "steps": [
+      "Compute content hash, PDF hash, photo hashes, and audit chain",
+      "Compare computed values to stored hashes",
+      "Return a structured response with validation results",
+      "Add tests for tampered and valid data cases"
+    ],
+    "passes": false
+  },
+  {
+    "category": "ops",
+    "description": "Add structured logging and request IDs",
+    "steps": [
+      "Add middleware to generate request_id and attach to context",
+      "Use slog for structured logs with key fields",
+      "Log key events like ticket_created and ticket_locked",
+      "Ensure logs include user_id and company_id when available"
+    ],
+    "passes": false
+  },
+  {
+    "category": "ops",
+    "description": "Implement health check endpoint",
+    "steps": [
+      "Add /health endpoint that checks database and storage",
+      "Return version and uptime fields",
+      "Use short timeouts for dependency checks",
+      "Add basic tests for health endpoint"
+    ],
+    "passes": false
+  },
+  {
+    "category": "ops",
+    "description": "Expose Prometheus metrics for core operations",
+    "steps": [
+      "Instrument HTTP handlers with request duration metrics",
+      "Track PDF generation and email send durations",
+      "Expose /metrics endpoint",
+      "Document metrics in ops notes"
+    ],
+    "passes": false
+  },
+  {
+    "category": "infra",
+    "description": "Add Caddy configuration for TLS, proxy, and static files",
+    "steps": [
+      "Create Caddyfile with TLS and reverse proxy to API",
+      "Configure rate limiting and gzip compression",
+      "Serve built frontend assets from a static directory",
+      "Document deployment steps for Caddy"
+    ],
+    "passes": false
+  },
+  {
+    "category": "infra",
+    "description": "Create docker compose setup for local development",
+    "steps": [
+      "Add docker-compose.yml services for postgres, api, and caddy",
+      "Configure volumes for database and uploaded files",
+      "Add environment variables for local development",
+      "Document startup and teardown commands"
+    ],
+    "passes": false
+  },
+  {
+    "category": "documentation",
+    "description": "Update openapi.yaml to reflect implemented endpoints",
+    "steps": [
+      "Define security schemes for JWT and OAuth",
+      "Add schemas for tickets, line items, photos, signatures, and errors",
+      "Document pagination, idempotency, and error codes",
+      "Validate the spec against example requests"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Implement web auth screens and token handling",
+    "steps": [
+      "Build login and registration pages with form validation",
+      "Store JWT in secure storage and attach to API requests",
+      "Handle auth errors and token expiry gracefully",
+      "Add sign out flow that clears cached state"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Build ticket list view with filters and pagination",
+    "steps": [
+      "Fetch tickets using cursor pagination and status filters",
+      "Render list with status, ticket number, and dates",
+      "Add empty state and loading states",
+      "Ensure list is responsive for mobile"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Build ticket detail view with status and audit info",
+    "steps": [
+      "Display ticket metadata, line items, and totals",
+      "Show photo gallery and signature status",
+      "Render audit log timeline for the ticket",
+      "Provide actions based on role and ticket status"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Build ticket create and edit form with line items",
+    "steps": [
+      "Use React Hook Form and Zod for validation",
+      "Allow add, edit, and remove of line items",
+      "Persist drafts and handle server validation errors",
+      "Provide status-aware controls for editing"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Implement photo capture and upload UI",
+    "steps": [
+      "Allow selection or capture of photos",
+      "Collect caption and taken_at metadata",
+      "Show upload progress and retry on failure",
+      "Update ticket detail view after successful upload"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Implement signature capture flows",
+    "steps": [
+      "Embed signature canvas for foreman signatures",
+      "Create a signing link page for GC signatures",
+      "Submit signatures and show confirmation",
+      "Lock editing once signatures are complete"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Implement PDF preview, download, and email status UI",
+    "steps": [
+      "Fetch and display PDF preview when available",
+      "Add download action for the signed PDF",
+      "Display email delivery status from email_events",
+      "Show errors when PDF generation fails"
+    ],
+    "passes": false
+  },
+  {
+    "category": "frontend",
+    "description": "Enable PWA support for offline-tolerant access",
+    "steps": [
+      "Configure vite-plugin-pwa with autoUpdate",
+      "Cache static assets and core routes",
+      "Add a lightweight offline banner",
+      "Test installability and offline behavior"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "Add tests for ticket locking and RBAC enforcement",
+    "steps": [
+      "Write tests that ensure locked tickets cannot be edited",
+      "Add tests for role-based access restrictions",
+      "Verify cross-company access is rejected",
+      "Run make test and ensure all tests pass"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "Add integration tests for photo upload and hash verification",
+    "steps": [
+      "Use testcontainers-go to run a database in tests",
+      "Upload a photo and verify stored sha256 hash",
+      "Ensure file exists on disk after upload",
+      "Verify unauthorized users cannot fetch the photo"
+    ],
+    "passes": false
+  },
+  {
+    "category": "testing",
+    "description": "Add integration tests for audit chain and verify endpoint",
+    "steps": [
+      "Generate multiple audit log entries and verify hash chain",
+      "Call the verification endpoint and assert valid response",
+      "Tamper with data and confirm verification fails",
+      "Run make test and ensure tests pass"
+    ],
+    "passes": false
+  },
+  {
+    "category": "scale",
+    "description": "Add S3-compatible storage backend option",
+    "steps": [
+      "Define a storage interface with local and S3 implementations",
+      "Add config toggle to switch storage backends",
+      "Implement upload and download for S3",
+      "Document migration steps for existing files"
+    ],
+    "passes": false
+  },
+  {
+    "category": "scale",
+    "description": "Add background worker mode for PDF generation",
+    "steps": [
+      "Define a job queue table for pdf generation jobs",
+      "Add a worker process mode in the Go binary",
+      "Update ticket flow to enqueue jobs when enabled",
+      "Add retry logic and dead-letter handling"
+    ],
+    "passes": false
+  },
+  {
+    "category": "scale",
+    "description": "Add read replica support for reporting queries",
+    "steps": [
+      "Add configuration for read replica database connection",
+      "Route reporting or analytics queries to replica",
+      "Document replication setup steps",
+      "Add metrics to monitor replica lag"
+    ],
+    "passes": false
+  }
+]

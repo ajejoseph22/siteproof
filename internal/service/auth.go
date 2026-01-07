@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ajejoseph22/siteproof/internal/config"
@@ -77,7 +79,97 @@ func (s *AuthService) Login(ctx context.Context, input *domain.LoginInput) (*Tok
 	}
 
 	// Generate tokens
-	tokens, err := s.generateTokenPair(&user, "")
+	tokens, err := s.generateTokenPair(ctx, &user, "")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return tokens, &user, nil
+}
+
+// Register creates a new company and admin user, then issues tokens.
+func (s *AuthService) Register(ctx context.Context, input *domain.RegisterInput) (*TokenPair, *domain.User, error) {
+	if err := input.Validate(); err != nil {
+		return nil, nil, err
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("begin registration: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var exists bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)
+	`, input.Email).Scan(&exists); err != nil {
+		return nil, nil, fmt.Errorf("check email: %w", err)
+	}
+	if exists {
+		return nil, nil, domain.NewDomainError(domain.ErrConflict, "EMAIL_EXISTS", "email already exists")
+	}
+
+	baseSlug := slugify(input.CompanyName)
+	if baseSlug == "" {
+		var errs domain.ValidationErrors
+		errs.Add("company_name", "must include letters or numbers")
+		return nil, nil, errs
+	}
+
+	var company domain.Company
+	created := false
+	for i := 0; i < 20; i++ {
+		slug := baseSlug
+		if i > 0 {
+			slug = fmt.Sprintf("%s-%d", baseSlug, i+1)
+		}
+
+		err = tx.QueryRow(ctx, `
+			INSERT INTO companies (name, slug)
+			VALUES ($1, $2)
+			RETURNING id, name, slug, settings, created_at, updated_at
+		`, input.CompanyName, slug).Scan(
+			&company.ID, &company.Name, &company.Slug, &company.Settings, &company.CreatedAt, &company.UpdatedAt,
+		)
+		if err == nil {
+			created = true
+			break
+		}
+		if isUniqueViolation(err) {
+			continue
+		}
+		return nil, nil, fmt.Errorf("create company: %w", err)
+	}
+	if !created {
+		return nil, nil, domain.NewDomainError(domain.ErrConflict, "COMPANY_SLUG_EXISTS", "company slug already exists")
+	}
+
+	hash, err := crypto.HashPassword(input.Password)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var user domain.User
+	err = tx.QueryRow(ctx, `
+		INSERT INTO users (company_id, email, password_hash, name, phone, role, active)
+		VALUES ($1, $2, $3, $4, $5, $6, true)
+		RETURNING id, company_id, email, name, phone, role, active, created_at, updated_at
+	`, company.ID, input.Email, hash, input.Name, input.Phone, domain.RoleAdmin).Scan(
+		&user.ID, &user.CompanyID, &user.Email, &user.Name, &user.Phone,
+		&user.Role, &user.Active, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, nil, domain.NewDomainError(domain.ErrConflict, "EMAIL_EXISTS", "email already exists")
+		}
+		return nil, nil, fmt.Errorf("create user: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, nil, fmt.Errorf("commit registration: %w", err)
+	}
+
+	tokens, err := s.generateTokenPair(ctx, &user, "")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -132,7 +224,7 @@ func (s *AuthService) RefreshTokens(ctx context.Context, refreshToken string) (*
 	}
 
 	// Generate new tokens
-	tokens, err := s.generateTokenPair(&user, "")
+	tokens, err := s.generateTokenPair(ctx, &user, "")
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +264,7 @@ func (s *AuthService) ValidateAccessToken(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
-func (s *AuthService) generateTokenPair(user *domain.User, deviceName string) (*TokenPair, error) {
+func (s *AuthService) generateTokenPair(ctx context.Context, user *domain.User, deviceName string) (*TokenPair, error) {
 	now := time.Now()
 	accessExpiry := now.Add(s.config.AccessTokenTTL)
 	refreshExpiry := now.Add(s.config.RefreshTokenTTL)
@@ -204,7 +296,7 @@ func (s *AuthService) generateTokenPair(user *domain.User, deviceName string) (*
 	refreshTokenHash := crypto.HashSHA256String(refreshTokenRaw)
 
 	// Store refresh token
-	_, err = s.pool.Exec(context.Background(), `
+	_, err = s.pool.Exec(ctx, `
 		INSERT INTO refresh_tokens (user_id, token_hash, expires_at, device_name)
 		VALUES ($1, $2, $3, $4)
 	`, user.ID, refreshTokenHash, refreshExpiry, deviceName)
@@ -217,4 +309,32 @@ func (s *AuthService) generateTokenPair(user *domain.User, deviceName string) (*
 		RefreshToken: refreshTokenRaw,
 		ExpiresAt:    accessExpiry,
 	}, nil
+}
+
+func slugify(input string) string {
+	lower := strings.ToLower(input)
+	var b strings.Builder
+	prevHyphen := false
+
+	for _, r := range lower {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			prevHyphen = false
+			continue
+		}
+		if !prevHyphen && b.Len() > 0 {
+			b.WriteByte('-')
+			prevHyphen = true
+		}
+	}
+
+	return strings.Trim(b.String(), "-")
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return false
 }

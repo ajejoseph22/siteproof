@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/ajejoseph22/siteproof/internal/domain"
@@ -28,6 +29,52 @@ type LoginRequest struct {
 type LoginResponse struct {
 	User   *domain.User       `json:"user"`
 	Tokens *service.TokenPair `json:"tokens"`
+}
+
+// RegisterRequest represents a registration request.
+type RegisterRequest struct {
+	CompanyName string  `json:"company_name"`
+	Email       string  `json:"email"`
+	Password    string  `json:"password"`
+	Name        string  `json:"name"`
+	Phone       *string `json:"phone,omitempty"`
+}
+
+// Register handles POST /api/v1/auth/register
+func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	var req RegisterRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		WriteError(w, http.StatusBadRequest, "INVALID_JSON", "invalid request body")
+		return
+	}
+
+	input := &domain.RegisterInput{
+		CompanyName: req.CompanyName,
+		Email:       req.Email,
+		Password:    req.Password,
+		Name:        req.Name,
+		Phone:       req.Phone,
+	}
+
+	tokens, user, err := h.authService.Register(r.Context(), input)
+	if err != nil {
+		var domainErr *domain.DomainError
+		if errors.As(err, &domainErr) && errors.Is(domainErr.Err, domain.ErrConflict) {
+			WriteError(w, http.StatusConflict, domainErr.Code, domainErr.Message)
+			return
+		}
+		if _, ok := err.(domain.ValidationErrors); ok {
+			WriteErrorWithDetails(w, http.StatusBadRequest, "VALIDATION_ERROR", "validation failed", err)
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "registration failed")
+		return
+	}
+
+	WriteJSON(w, http.StatusCreated, LoginResponse{
+		User:   user,
+		Tokens: tokens,
+	})
 }
 
 // Login handles POST /api/v1/auth/login
