@@ -330,7 +330,18 @@
       "Add helper to verify hash chain for a ticket",
       "Include audit log entries for key actions"
     ],
-    "passes": false
+    "passes": true,
+    "notes": [
+      "Hash chain computation is implemented at database level via `compute_audit_hash` trigger in migration 000010.",
+      "Trigger computes SHA-256 hash of: prev_hash + entity_type + entity_id + action + occurred_at + changes.",
+      "Added `AuditService` in `internal/service/audit.go` with chain verification methods.",
+      "Added `VerifyChainForEntity` method that validates hash chain for a specific ticket's audit log range.",
+      "Added `VerifyGlobalChain` method for verifying the entire audit log hash chain.",
+      "Added `AuditHandler` with endpoints: GET /tickets/{id}/audit-logs (list), GET /tickets/{id}/audit-logs/verify (verify chain), GET /tickets/{id}/audit-logs/full (with hashes).",
+      "Added sqlc queries: `VerifyAuditChainForEntity`, `GetAuditLogsByEntityWithHashes`, `CountAuditLogsByEntity`.",
+      "All audit log writes in services (ticket, photo, line_item, signature, signing_link) continue using existing `insertAuditLog` pattern.",
+      "`make build` and `make test` pass."
+    ]
   },
   {
     "category": "backend",

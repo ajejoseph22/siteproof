@@ -197,3 +197,25 @@
   - Validates token expiry, used, and revoked status
   - Marks signing link as used after successful signature capture
 - `make build` and `make test` pass
+
+## Audit Log Hash Chain Verification
+- Implemented audit log hash chain verification for tamper-evidence:
+  - Database trigger `compute_audit_hash` (in migration 000010) computes SHA-256 hashes
+  - Trigger computes: SHA-256(prev_hash + entity_type + entity_id + action + occurred_at + changes)
+  - Immutability trigger `prevent_audit_modification` blocks UPDATE/DELETE on audit_logs
+- Created `AuditService` in `internal/service/audit.go`:
+  - `VerifyChainForEntity`: Validates hash chain for a specific entity's audit log range
+  - `VerifyGlobalChain`: Validates the entire audit log hash chain
+  - `GetByEntity`: Retrieves audit logs with company-scoped authorization
+  - `GetByEntityWithHashes`: Returns audit logs in chronological order with hash info
+- Created `AuditHandler` in `internal/handler/audit.go`:
+  - `GET /api/v1/tickets/{id}/audit-logs` - List audit logs for a ticket (paginated)
+  - `GET /api/v1/tickets/{id}/audit-logs/verify` - Verify hash chain integrity for ticket
+  - `GET /api/v1/tickets/{id}/audit-logs/full` - Get full audit trail with hashes (chronological)
+- Added sqlc queries in `internal/repository/queries/audit_logs.sql`:
+  - `VerifyAuditChainForEntity`: Checks chain validity for an entity's audit log range
+  - `GetAuditLogsByEntityWithHashes`: Returns logs in chronological order with hash fields
+  - `CountAuditLogsByEntity`: Counts audit logs for an entity
+- Wired AuditHandler routes in `cmd/api/main.go` under `/tickets/{id}/audit-logs`
+- All endpoints require `ticket:read` permission (RBAC enforced)
+- `make build` and `make test` pass

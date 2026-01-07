@@ -65,6 +65,7 @@ func main() {
 	queries := db.New(pool)
 	signingLinkService := service.NewSigningLinkService(pool, queries, cfg.Server.BaseURL)
 	signatureService := service.NewSignatureService(pool, queries)
+	auditService := service.NewAuditService(pool, queries)
 
 	// Initialize handlers
 	healthHandler := handler.NewHealthHandler(pool, cfg.Storage.BasePath, Version)
@@ -75,6 +76,7 @@ func main() {
 	fileHandler := handler.NewFileHandler(fileService, cfg.Storage.BasePath)
 	signingLinkHandler := handler.NewSigningLinkHandler(signingLinkService)
 	signatureHandler := handler.NewSignatureHandler(signatureService, cfg.Storage.BasePath)
+	auditHandler := handler.NewAuditHandler(auditService)
 
 	// Suppress unused variable warning (userService will be used later)
 	_ = userService
@@ -178,6 +180,12 @@ func main() {
 						middleware.RequirePermission(domain.PermissionTicketWrite),
 						middleware.Idempotency(queries),
 					).Post("/", signatureHandler.CaptureForeman)
+				})
+				// Audit log endpoints (for viewing audit trail and verifying hash chain)
+				r.Route("/{id}/audit-logs", func(r chi.Router) {
+					r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/", auditHandler.ListByTicket)
+					r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/verify", auditHandler.VerifyTicketChain)
+					r.With(middleware.RequirePermission(domain.PermissionTicketRead)).Get("/full", auditHandler.GetTicketAuditLogWithHashes)
 				})
 			})
 
