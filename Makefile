@@ -15,6 +15,10 @@ DB_SSLMODE ?= disable
 
 DATABASE_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSLMODE)
 MIGRATIONS_PATH ?= migrations
+GOCACHE_DIR ?= $(CURDIR)/.cache/go-build
+GOMODCACHE_DIR ?= $(CURDIR)/.cache/go-mod
+GOPATH_DIR ?= $(CURDIR)/.cache/go
+GOLANGCI_LINT_CACHE_DIR ?= $(CURDIR)/.cache/golangci-lint
 
 # =============================================================================
 # DATABASE COMMANDS
@@ -130,12 +134,13 @@ dev:
 
 ## test: Run all tests
 test:
-	@mkdir -p .cache/go-build
-	GOCACHE=$(CURDIR)/.cache/go-build go test -v ./...
+	@mkdir -p $(GOCACHE_DIR)
+	GOCACHE=$(GOCACHE_DIR) go test -v ./...
 
 ## lint: Run linters
 lint:
-	golangci-lint run
+	@mkdir -p $(GOCACHE_DIR) $(GOMODCACHE_DIR) $(GOPATH_DIR) $(GOLANGCI_LINT_CACHE_DIR)
+	GOCACHE=$(GOCACHE_DIR) GOMODCACHE=$(GOMODCACHE_DIR) GOPATH=$(GOPATH_DIR) GOLANGCI_LINT_CACHE=$(GOLANGCI_LINT_CACHE_DIR) golangci-lint run
 
 ## fmt: Format code
 fmt:
