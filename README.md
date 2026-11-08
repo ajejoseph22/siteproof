@@ -94,3 +94,7 @@ The full task list, with acceptance steps and status, lives in [`plans/prd.json`
 - Web UI for ticket list and detail, the create/edit form with line items, photo upload, signature flows and PDF preview
 - Tests for ticket locking, RBAC, photo hashing and the audit chain
 - Prometheus metrics, a Caddy config, and S3-compatible storage
+
+## License
+
+SiteProof is licensed under the [Apache License 2.0](LICENSE).
