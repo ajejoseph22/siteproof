@@ -87,7 +87,7 @@ CI runs vet, tests, lint, sqlc verification, a Typst compile and the client buil
 
 ## Roadmap
 
-The full task list, with acceptance steps and status, lives in [`plans/prd.json`](plans/prd.json). [`MVP_BACKLOG.md`](MVP_BACKLOG.md) summarises the gaps. Main open items:
+See [`ROADMAP.md`](ROADMAP.md) for the open work, grouped by milestone. The full task list, with acceptance steps and status, lives in [`plans/prd.json`](plans/prd.json). Main open items:
 
 - Content hashing at lock time, PDF generation with Typst, and a ticket integrity verify endpoint
 - Email via Postmark (with delivery webhooks), SMS signing links via Twilio, and voice-note cleanup via OpenAI
