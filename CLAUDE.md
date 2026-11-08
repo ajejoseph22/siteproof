@@ -19,9 +19,9 @@ make sqlc-generate          # Regenerate Go code from SQL queries
 
 ### Frontend (Vite + React)
 ```bash
-cd frontend && npm run dev      # Start dev server
-cd frontend && npm run build    # Build (tsc -b && vite build)
-cd frontend && npm run lint     # ESLint
+cd client && npm run dev      # Start dev server
+cd client && npm run build    # Build (tsc -b && vite build)
+cd client && npm run lint     # ESLint
 ```
 
 ### Database
@@ -59,8 +59,7 @@ Handler (HTTP) → Service (business logic) → Repository (DB) → Domain (enti
 - `pkg/crypto/` - Password hashing, SHA-256 utilities
 - `migrations/` - SQL migrations (golang-migrate)
 - `templates/` - Typst templates for PDF generation
-- `frontend/` - React + Vite web app
-- `web/` - Alternative React web app (signature canvas)
+- `client/` - React + Vite web app
 
 ### Key Technologies
 - **Backend**: Go 1.22+, Chi router, pgx/v5, sqlc, JWT
