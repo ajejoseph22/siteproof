@@ -18,7 +18,7 @@ This list compares the Phase 1 MVP requirements in `ADR/architecture.md` with th
 - **Integrity verification**: `/api/v1/tickets/{id}/verify` to check content hash, PDF hash, photo hashes, and audit chain.
 - **Role enforcement**: Apply `RequireRole` to endpoints (foreman vs GC vs PM vs admin).
 
-## Frontend/UI Gaps (Primary `frontend/`)
+## Frontend/UI Gaps (`client/`)
 - **Line items UI**: Add/edit/remove line items during ticket creation and detail views.
 - **Photo gallery + upload**: Wire photo upload and display to the API.
 - **Voice notes**: Capture raw text, request cleanup, and show raw vs cleaned.

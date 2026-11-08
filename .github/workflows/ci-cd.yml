@@ -3,6 +3,7 @@ name: CI/CD
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -63,8 +64,11 @@ jobs:
       - name: Client build
         run: cd client && npm ci && npm run build
 
+  # Image build and deploy run only when triggered by hand from the Actions tab,
+  # so pushes and pull requests never publish images or touch the server.
   build-api:
     needs: test
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +92,7 @@ jobs:
   deploy:
     needs: build-api
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     environment: PROD
     steps:
       - uses: actions/checkout@v4
